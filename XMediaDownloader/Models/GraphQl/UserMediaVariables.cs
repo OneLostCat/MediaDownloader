@@ -1,8 +1,8 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace XMediaDownloader.Models;
+namespace XMediaDownloader.Models.GraphQl;
 
-public record UserMediaQueryVariables
+public record UserMediaVariables
 {
     public required string UserId { get; set; }
     public required int Count { get; set; }
@@ -15,6 +15,6 @@ public record UserMediaQueryVariables
 }
 
 // Json 序列化
-[JsonSerializable(typeof(UserMediaQueryVariables))]
+[JsonSerializable(typeof(UserMediaVariables))]
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
-public partial class UserMediaQueryVariablesContext : JsonSerializerContext;
+public partial class UserMediaVariablesContext : JsonSerializerContext;

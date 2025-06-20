@@ -20,7 +20,7 @@ public record User
     public required string Name { get; set; }
 
     // [JsonPropertyName("description")]
-    public string? Description { get; set; }
+    public required string Description { get; set; }
 
     // [JsonPropertyName("created_time")]
     public required DateTime CreatedTime { get; set; }
@@ -28,7 +28,7 @@ public record User
 
 public record UserData
 {
-    public string? CurrentCursor { get; set; }
+    public string CurrentCursor { get; set; } = "";
     public Dictionary<string, UserDataItem> Users { get; set; } = new();
 }
 

@@ -11,7 +11,7 @@ using XMediaDownloader.Models;
 // 命令行
 // 下载选项
 var usernameOption = new Option<string>(["-u", "--username"], "目标用户") { IsRequired = true };
-var downloadTypesListOption = new Option<List<DownloadType>>(["-t", "--download-type"], "下载类型")
+var downloadTypeListOption = new Option<List<DownloadType>>(["-t", "--download-type"], "下载类型")
     { IsRequired = true, Arity = ArgumentArity.OneOrMore, AllowMultipleArgumentsPerToken = true };
 var cookieFileOption = new Option<FileInfo>(["-c", "--cookie-file"], "Cookie 文件，用于请求 API") { IsRequired = true };
 
@@ -23,7 +23,7 @@ var filenameOption = new Option<string>(["-f", "--filename"], "输出文件名�
 var command = new RootCommand("X 媒体下载工具");
 
 command.AddOption(usernameOption);
-command.AddOption(downloadTypesListOption);
+command.AddOption(downloadTypeListOption);
 command.AddOption(cookieFileOption);
 command.AddOption(dirOption);
 command.AddOption(filenameOption);
@@ -31,7 +31,7 @@ command.AddOption(filenameOption);
 command.SetHandler(async context =>
 {
     var username = context.ParseResult.GetValueForOption(usernameOption)!;
-    var downloadType = context.ParseResult.GetValueForOption(downloadTypesListOption)!.Aggregate((a, b) => a | b); // 按位合并参数
+    var downloadType = context.ParseResult.GetValueForOption(downloadTypeListOption)!.Aggregate((a, b) => a | b); // 按位合并参数
     var cookieFile = context.ParseResult.GetValueForOption(cookieFileOption)!;
     var dir = context.ParseResult.GetValueForOption(dirOption)!;
     var filename = context.ParseResult.GetValueForOption(filenameOption)!;
@@ -65,7 +65,7 @@ static async Task RunAsync(string username, DownloadType downloadType, FileInfo 
         // 命令行参数
         builder.Services.AddSingleton(new CommandLineArguments
         {
-            User = username,
+            Username = username,
             DownloadType = downloadType,
             CookieFile = cookieFile,
             Dir = dir,

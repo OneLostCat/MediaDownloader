@@ -1,7 +1,4 @@
-﻿using System.Net.Http.Json;
-using System.Text;
-using System.Text.Json;
-using Microsoft.Extensions.Hosting;
+﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using XMediaDownloader.Models;
 
@@ -19,7 +16,7 @@ public class MainService(
         OutputArgumentsInfo();
 
         // 获取目标 UserId
-        var user = await apiService.GetUserAsync(arguments.User, cancel);
+        var user = await apiService.GetUserAsync(arguments.Username, cancel);
         
         OutputUserInfo(user);
 
@@ -34,7 +31,7 @@ public class MainService(
 
     private void OutputArgumentsInfo()
     {
-        logger.LogInformation("目标用户: {User}", arguments.User);
+        logger.LogInformation("目标用户: {User}", arguments.Username);
         logger.LogInformation("下载类型: {DownloadType}", arguments.DownloadType == DownloadType.All ? "All" : arguments.DownloadType);
         logger.LogInformation("Cookie 文件: {CookieFile}", arguments.CookieFile.Name);
         logger.LogInformation("输出目录格式: {Dirname}", arguments.Dir);

@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using XMediaDownloader.Models;
+using XMediaDownloader.Models.GraphQl;
 
 namespace XMediaDownloader;
 
@@ -57,8 +58,8 @@ public class XApiService(ILogger<XApiService> logger, IHttpClientFactory httpCli
         logger.LogInformation("获取用户信息: {Username}", username);
 
         // 参数
-        var variables = JsonSerializer.Serialize(new ProfileSpotlightsQueryVariables { ScreenName = username },
-            ProfileSpotlightsQueryVariablesContext.Default.ProfileSpotlightsQueryVariables);
+        var variables = JsonSerializer.Serialize(new ProfileSpotlightsVariables { ScreenName = username },
+            ProfileSpotlightsVariablesContext.Default.ProfileSpotlightsVariables);
 
         // 请求
         var request = new HttpRequestMessage(HttpMethod.Get, BuildUrl(ProfileSpotlightsUrl, variables));
@@ -67,20 +68,20 @@ public class XApiService(ILogger<XApiService> logger, IHttpClientFactory httpCli
         var response = await _httpClient.SendAsync(request, cancel);
 
         // 解析响应
-        var content = await response.Content.ReadFromJsonAsync<GraphQlResponse>(
-            GraphQlResponseContext.Default.GraphQlResponse, cancel);
+        var content = await response.Content.ReadFromJsonAsync<GraphQlResponse<ProfileSpotlightsResponse>>(
+            ProfileSpotlightsResponseContext.Default.GraphQlResponseProfileSpotlightsResponse, cancel);
 
-        if (content?.Data?.UserResultByScreenName?.Result == null) throw new Exception("无法获取用户信息");
+        if (content?.Data?.UserResultByScreenName.Result == null) throw new Exception("无法获取用户信息");
 
         // 生成用户信息
-        return GetUserInfo(content.Data?.UserResultByScreenName?.Result!);
+        return GetUserInfo(content.Data.UserResultByScreenName.Result);
     }
 
     public async Task GetMediaAsync(string userId, CancellationToken cancel)
     {
         // 加载数据
         await storage.LoadAsync();
-        var cursor = storage.Content.Data[userId].CurrentCursor ?? "";
+        var cursor = storage.Content.Data[userId].CurrentCursor;
 
         while (true)
         {
@@ -101,17 +102,17 @@ public class XApiService(ILogger<XApiService> logger, IHttpClientFactory httpCli
     // 工具方法
     private User GetUserInfo(UserResultInfo userInfo) => new()
     {
-        Id = userInfo.RestId ?? throw new Exception("用户 ID 不能为 null"),
-        ScreenName = userInfo.Legacy?.ScreenName ?? "",
-        Name = userInfo.Legacy?.Name ?? "",
-        Description = userInfo.Legacy?.Description ?? "",
+        Id = userInfo.RestId,
+        ScreenName = userInfo.Legacy.ScreenName,
+        Name = userInfo.Legacy.Name,
+        Description = userInfo.Legacy.Description,
         CreatedTime = DateTime.UtcNow
     };
 
     private async Task<(string, List<Tweet>)> GetMediaAsync(string userId, string cursor, int count, CancellationToken cancel)
     {
         // 参数
-        var variables = JsonSerializer.Serialize(new UserMediaQueryVariables
+        var variables = JsonSerializer.Serialize(new UserMediaVariables
         {
             UserId = userId,
             Count = count,
@@ -121,7 +122,7 @@ public class XApiService(ILogger<XApiService> logger, IHttpClientFactory httpCli
             WithVoice = true,
             WithV2Timeline = true,
             Cursor = cursor
-        }, UserMediaQueryVariablesContext.Default.UserMediaQueryVariables);
+        }, UserMediaVariablesContext.Default.UserMediaVariables);
 
         // 请求
         var request = new HttpRequestMessage(HttpMethod.Get,
@@ -132,19 +133,21 @@ public class XApiService(ILogger<XApiService> logger, IHttpClientFactory httpCli
 
         // 解析
         var content =
-            await response.Content.ReadFromJsonAsync<GraphQlResponse>(GraphQlResponseContext.Default.GraphQlResponse, cancel);
+            await response.Content.ReadFromJsonAsync<GraphQlResponse<UserMediaResponse>>(
+                UserMediaResponseContext.Default.GraphQlResponseUserMediaResponse, cancel);
 
         // 获取帖子
         var newTweets = new List<Tweet>();
         var nextCursor = cursor;
 
-        foreach (var instruction in content?.Data?.User?.Result?.TimelineV2?.Timeline?.Instructions!)
+        foreach (var instruction in content?.Data?.User.Result.TimelineV2.Timeline.Instructions ??
+                                    throw new Exception("指令不能为 null"))
         {
             if (instruction.Type == "TimelineAddEntries")
             {
                 foreach (var entry in instruction.Entries)
                 {
-                    if (entry.EntryId!.StartsWith("profile-"))
+                    if (entry.EntryId.StartsWith("profile-"))
                     {
                         var tweet = ProcessTweetMedia(entry);
 
@@ -155,7 +158,7 @@ public class XApiService(ILogger<XApiService> logger, IHttpClientFactory httpCli
                     }
                     else if (entry.EntryId.StartsWith("cursor-bottom-"))
                     {
-                        nextCursor = entry.Content?.Value!;
+                        nextCursor = entry.Content.Value;
                     }
                 }
             }
@@ -163,7 +166,7 @@ public class XApiService(ILogger<XApiService> logger, IHttpClientFactory httpCli
             {
                 newTweets.AddRange(instruction.ModuleItems
                     .ToAsyncEnumerable()
-                    .Where(entry => entry.EntryId?.StartsWith("profile-") ?? throw new Exception("媒体不能为 null"))
+                    .Where(entry => entry.EntryId.StartsWith("profile-"))
                     .SelectAwait(ProcessTweetMediaSingle)
                     .ToEnumerable()
                 );
@@ -193,50 +196,49 @@ public class XApiService(ILogger<XApiService> logger, IHttpClientFactory httpCli
     private List<Tweet> ProcessTweetMedia(TimelineEntry entry)
     {
         var tweets = new List<Tweet>();
-        
-        if (entry.Content!.Items.Count == 0) return tweets;
+
+        if (entry.Content.Items.Count == 0) return tweets;
 
         foreach (var item in entry.Content.Items)
         {
-            if (item.Item?.ItemContent?.TweetResults?.Result == null) continue;
+            // if (item.Item.ItemContent.TweetResults.Result == null) continue;
 
             var tweetResult = item.Item.ItemContent.TweetResults.Result;
 
-            if (tweetResult.Tombstone != null) continue;
+            // if (tweetResult.Tombstone != null) continue;
 
-            var userInfo = tweetResult.Core?.UserResults?.Result;
+            var userInfo = tweetResult.Core.UserResults.Result;
 
-            if (userInfo?.RestId == null) throw new Exception("用户 ID 不能为 null");
+            // if (userInfo.RestId == null) throw new Exception("用户 ID 不能为 null");
 
             // 储存用户信息
             storage.Content.Users[userInfo.RestId] = GetUserInfo(userInfo);
 
             var tweet = new Tweet
             {
-                Id = tweetResult.RestId ?? throw new Exception("推文 ID 不能为 null"),
+                Id = tweetResult.RestId,
                 UserId = userInfo.RestId,
-                Text = tweetResult.Legacy?.FullText ?? throw new Exception("推文不能为 null"),
-                Hashtags = tweetResult.Legacy?.Entities?.Hashtags.Select(x => x.Text ?? throw new Exception("标签不能为 null"))
-                    .ToList() ?? [],
-                CreatedAt = tweetResult.Legacy?.CreatedAt ?? throw new Exception("推文创建时间不能为 null"),
-                Media = ProcessMedia(tweetResult.Legacy?.ExtendedEntities?.Media ?? [])
+                Text = tweetResult.Legacy.FullText ,
+                Hashtags = tweetResult.Legacy.Entities.Hashtags.Select(x => x.Text).ToList(),
+                CreatedAt = tweetResult.Legacy.CreatedAt,
+                Media = ProcessMedia(tweetResult.Legacy.ExtendedEntities.Media)
             };
 
             tweets.Add(tweet);
         }
-        
+
         return tweets;
     }
 
     private async ValueTask<Tweet> ProcessTweetMediaSingle(ItemMedia entry)
     {
-        var tweetResult = entry.Item?.ItemContent?.TweetResults?.Result;
+        var tweetResult = entry.Item.ItemContent.TweetResults.Result;
 
-        if (tweetResult == null) return null;
+        // if (tweetResult == null) return null;
 
-        var userInfo = tweetResult.Core?.UserResults?.Result;
+        var userInfo = tweetResult.Core.UserResults.Result;
 
-        if (userInfo?.RestId == null) throw new Exception("用户 ID 不能为 null");
+        // if (userInfo.RestId == null) throw new Exception("用户 ID 不能为 null");
 
         // 储存用户信息
         storage.Content.Users[userInfo.RestId] = GetUserInfo(userInfo);
@@ -244,27 +246,24 @@ public class XApiService(ILogger<XApiService> logger, IHttpClientFactory httpCli
 
         return new Tweet
         {
-            Id = tweetResult.RestId ?? throw new Exception("推文 ID 不能为 null"),
+            Id = tweetResult.RestId,
             UserId = userInfo.RestId,
-            Text = tweetResult.Legacy?.FullText ?? throw new Exception("推文不能为 null"),
-            Hashtags = tweetResult.Legacy?.Entities?.Hashtags.Select(h => h.Text ?? throw new Exception("标签不能为 null"))
-                .ToList() ?? [],
-            CreatedAt = tweetResult.Legacy?.CreatedAt ?? throw new Exception("推文创建时间不能为 null"),
-            Media = ProcessMedia(tweetResult.Legacy?.Entities?.Media ?? [])
+            Text = tweetResult.Legacy.FullText,
+            Hashtags = tweetResult.Legacy.Entities.Hashtags.Select(h => h.Text).ToList(),
+            CreatedAt = tweetResult.Legacy.CreatedAt,
+            Media = ProcessMedia(tweetResult.Legacy.Entities.Media)
         };
     }
 
-    private List<Media> ProcessMedia(List<MediaEntity> mediaEntities)
+    private List<TweetMedia> ProcessMedia(List<MediaEntity> mediaEntities)
     {
         if (mediaEntities.Count == 0) return [];
 
-        return mediaEntities.Select(x => new Media
+        return mediaEntities.Select(x => new TweetMedia
         {
-            Type = x.Type ?? throw new Exception("媒体类型为 null"),
-            Url = x.Type == "photo"
-                ? GetOriginalImageUrl(x.MediaUrlHttps ?? throw new Exception("媒体 Url 不能为 null"))
-                : GetHighestQualityVideoUrl(x.VideoInfo ?? throw new Exception("视频不能为 null")),
-            Bitrate = x.Type == "video" ? GetHighestBitrate(x.VideoInfo ?? throw new Exception("视频不能为 null")) : null
+            Type = x.Type,
+            Url = x.Type == "photo" ? GetOriginalImageUrl(x.MediaUrlHttps) : GetHighestQualityVideoUrl(x.VideoInfo),
+            Bitrate = x.Type == "video" ? GetHighestBitrate(x.VideoInfo) : null
         }).ToList();
     }
 
@@ -281,7 +280,7 @@ public class XApiService(ILogger<XApiService> logger, IHttpClientFactory httpCli
         .Where(x => x.Bitrate.HasValue)
         .OrderByDescending(x => x.Bitrate)
         .First()
-        .Url!;
+        .Url;
 
     private long? GetHighestBitrate(VideoInfo videoInfo) => videoInfo.Variants
         .Where(v => v.Bitrate.HasValue)

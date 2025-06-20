@@ -1,6 +1,7 @@
 ﻿using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using XMediaDownloader.Models;
+using XMediaDownloader.Models.GraphQl;
 
 namespace XMediaDownloader;
 
@@ -165,9 +166,9 @@ public class StorageService(ILogger<StorageService> logger) : IAsyncDisposable
         Content.Users[userInfo.RestId] = new User
         {
             Id = userInfo.RestId,
-            ScreenName = userInfo.Legacy?.ScreenName ?? "",
-            Name = userInfo.Legacy?.Name ?? "",
-            Description = userInfo.Legacy?.Description ?? "",
+            ScreenName = userInfo.Legacy.ScreenName,
+            Name = userInfo.Legacy.Name,
+            Description = userInfo.Legacy.Description,
             CreatedTime = DateTime.UtcNow
         };
     }
