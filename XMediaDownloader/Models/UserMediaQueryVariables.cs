@@ -2,7 +2,6 @@
 
 namespace XMediaDownloader.Models;
 
-[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 public record UserMediaQueryVariables
 {
     public required string UserId { get; set; }
@@ -14,3 +13,8 @@ public record UserMediaQueryVariables
     public required bool WithV2Timeline { get; set; }
     public required string Cursor { get; set; }
 }
+
+// Json 序列化
+[JsonSerializable(typeof(UserMediaQueryVariables))]
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+public partial class UserMediaQueryVariablesContext : JsonSerializerContext;
