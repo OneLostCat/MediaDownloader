@@ -1,122 +1,142 @@
 ﻿using System.CommandLine;
 using System.Net;
 using System.Net.Http.Headers;
-using System.Net.Http.Json;
-using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Serilog;
+using Serilog.Events;
 using XMediaDownloader;
 using XMediaDownloader.Models;
-using AppJsonSerializerContext = XMediaDownloader.Models.AppJsonSerializerContext;
 
-// 日志
-await using var logger = new LoggerConfiguration()
-    .WriteTo.Console()
-    // .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3} {SourceContext}] {Message:lj}{NewLine}{Exception}")
-    .CreateLogger();
-
-Log.Logger = logger;
-
+// 命令行
 // 下载选项
-var accountOption = new Option<string>(["-a", "--account"], "目标账户") { IsRequired = true };
-var mediaTypeOption = new Option<List<MediaType>>(["-t", "--type"], "目标媒体类型")
+var usernameOption = new Option<string>(["-u", "--username"], "目标用户") { IsRequired = true };
+var downloadTypesListOption = new Option<List<DownloadType>>(["-t", "--download-type"], "下载类型")
     { IsRequired = true, Arity = ArgumentArity.OneOrMore, AllowMultipleArgumentsPerToken = true };
-var cookieOption = new Option<FileInfo>(["-c", "--cookie"], "Cookie 文件，用于请求 API") { IsRequired = true };
+var cookieFileOption = new Option<FileInfo>(["-c", "--cookie-file"], "Cookie 文件，用于请求 API") { IsRequired = true };
 
 // 输出选项
-var dirnameOption = new Option<string>(["-d", "--dirname"], "目录名称格式") { IsRequired = true };
-var filenameOption = new Option<string>(["-f", "--filename"], "文件名称格式") { IsRequired = true };
+var dirOption = new Option<string>(["-d", "--dir"], "输出目录格式") { IsRequired = true };
+var filenameOption = new Option<string>(["-f", "--filename"], "输出文件名格式") { IsRequired = true };
 
 // 根命令
-var rootCommand = new RootCommand("X 媒体下载工具");
+var command = new RootCommand("X 媒体下载工具");
 
-rootCommand.AddOption(accountOption);
-rootCommand.AddOption(mediaTypeOption);
-rootCommand.AddOption(cookieOption);
-rootCommand.AddOption(dirnameOption);
-rootCommand.AddOption(filenameOption);
+command.AddOption(usernameOption);
+command.AddOption(downloadTypesListOption);
+command.AddOption(cookieFileOption);
+command.AddOption(dirOption);
+command.AddOption(filenameOption);
 
-rootCommand.SetHandler(async context =>
+command.SetHandler(async context =>
 {
-    var account = context.ParseResult.GetValueForOption(accountOption) ?? throw new Exception("无法解析目标账户");
-    var mediaType = context.ParseResult.GetValueForOption(mediaTypeOption) ?? throw new Exception("无法解析媒体类型");
-    var cookieFile = context.ParseResult.GetValueForOption(cookieOption) ?? throw new Exception("无法解析 Cookie 文件");
-    var dirname = context.ParseResult.GetValueForOption(dirnameOption) ?? throw new Exception("无法解析目录名称格式");
-    var filename = context.ParseResult.GetValueForOption(filenameOption) ?? throw new Exception("无法解析文件名称格式");
+    var username = context.ParseResult.GetValueForOption(usernameOption)!;
+    var downloadType = context.ParseResult.GetValueForOption(downloadTypesListOption)!.Aggregate((a, b) => a | b); // 按位合并参数
+    var cookieFile = context.ParseResult.GetValueForOption(cookieFileOption)!;
+    var dir = context.ParseResult.GetValueForOption(dirOption)!;
+    var filename = context.ParseResult.GetValueForOption(filenameOption)!;
 
-    await Handle(account, mediaType, cookieFile, dirname, filename, context.GetCancellationToken());
+    await RunAsync(username, downloadType, cookieFile, dir, filename, context.GetCancellationToken());
 });
 
-try
-{
-    return await rootCommand.InvokeAsync(args);
-}
-catch (Exception exception)
-{
-    logger.Fatal(exception, "错误");
-    return 1;
-}
+return await command.InvokeAsync(args);
 
-static async Task Handle(string username, List<MediaType> mediaType, FileInfo cookieFile, string dirname, string filename,
+
+static async Task RunAsync(string username, DownloadType downloadType, FileInfo cookieFile, string dir, string filename,
     CancellationToken cancel)
 {
-    var serviceCollection = new ServiceCollection();
+    // 日志
+    await using var logger = new LoggerConfiguration()
+        .WriteTo.Console(outputTemplate: "[{Level:u3}] {Message:lj}{NewLine}{Exception}")
+        // .WriteTo.Console(outputTemplate: "[{Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}")
+        .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Warning)
+        // .MinimumLevel.Override("Microsoft.Extensions.Hosting.Internal.Host", LogEventLevel.Warning)
+        // .MinimumLevel.Override("System.Net.Http.HttpClient", LogEventLevel.Warning)
+        .CreateLogger();
 
-    serviceCollection.AddSerilog();
+    Log.Logger = logger;
 
-    // 读取 Cookie
-    var cookie = await GetCookie(cookieFile, cancel);
+    logger.Information("---------- X 媒体下载工具 ----------");
 
-    // 添加 HttpClient
-    AddHttpClient(serviceCollection, cookie);
+    try
+    {
+        var builder = Host.CreateApplicationBuilder(Environment.GetCommandLineArgs());
 
-    // 构建服务
-    var services = serviceCollection.BuildServiceProvider();
-    var logger = services.GetRequiredService<ILogger>();
-    var httpClient = services.GetRequiredService<IHttpClientFactory>().CreateClient("X");
+        // 命令行参数
+        builder.Services.AddSingleton(new CommandLineArguments
+        {
+            User = username,
+            DownloadType = downloadType,
+            CookieFile = cookieFile,
+            Dir = dir,
+            Filename = filename
+        });
 
-    // 获取目标 UserId
-    var userId = await GetUserId(logger, httpClient, username, cancel);
+        // 主机日志
+        builder.Services.AddSerilog();
+        
+        // 主服务
+        builder.Services.AddHostedService<MainService>();
+        
+        // X API 服务
+        builder.Services.AddSingleton<XApiService>();
+        
+        // 存储服务
+        builder.Services.AddSingleton<StorageService>();
 
-    // 获取所有媒体
+        // HttpClient
+        await AddHttpClientAsync(builder.Services, cookieFile, cancel);
+
+        // GraphQL
+        // builder.Services.AddGraphQL(config => { });
+
+        var app = builder.Build();
+
+        await app.RunAsync(cancel);
+    }
+    catch (Exception exception)
+    {
+        logger.Fatal(exception, "错误");
+    }
+
+    logger.Information("应用退出");
 }
 
-static async Task<CookieContainer> GetCookie(FileInfo cookieFile, CancellationToken cancel)
+static async Task AddHttpClientAsync(IServiceCollection serviceCollection, FileInfo cookieFile, CancellationToken cancel)
 {
+    // 加载 Cookie
     var cookie = new CookieContainer();
-    var cookieString = await File.ReadAllTextAsync(cookieFile.FullName, cancel);
+    var cookieString = await File.ReadAllTextAsync(cookieFile.Name, cancel);
 
-    // 解析 Cookie 文件
     foreach (var cookieItem in cookieString.Split(';', StringSplitOptions.TrimEntries))
     {
         var cookiePair = cookieItem.Split('=');
 
         if (cookiePair.Length == 2)
         {
-            cookie.Add(new Uri(XApiEndpoints.BaseUrl), new Cookie(cookiePair[0], cookiePair[1]));
+            cookie.Add(new Uri(XApiService.BaseUrl), new Cookie(cookiePair[0], cookiePair[1]));
         }
     }
 
-    return cookie;
-}
+    serviceCollection.AddSingleton(cookie);
 
-static void AddHttpClient(ServiceCollection serviceCollection, CookieContainer cookie)
-{
+    // 创建 HttpClient
     var httpClientBuilder = serviceCollection.AddHttpClient("X", config =>
     {
         // 基础地址
-        config.BaseAddress = new Uri(XApiEndpoints.BaseUrl);
+        config.BaseAddress = new Uri(XApiService.BaseUrl);
 
         // User-Agent
         config.DefaultRequestHeaders.Add("User-Agent",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 Edg/137.0.0.0");
 
         // 验证
-        config.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", XApiEndpoints.Bearer);
-        config.DefaultRequestHeaders.Add("x-csrf-token", cookie.GetCookies(new Uri(XApiEndpoints.BaseUrl))["ct0"]?.Value);
+        config.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", XApiService.Bearer);
+        config.DefaultRequestHeaders.Add("x-csrf-token", cookie.GetCookies(new Uri(XApiService.BaseUrl))["ct0"]?.Value);
         config.DefaultRequestHeaders.Add("x-twitter-active-user", "yes");
         config.DefaultRequestHeaders.Add("x-twitter-auth-type", "OAuth2Session");
-        config.DefaultRequestHeaders.Add("x-twitter-client-language", cookie.GetCookies(new Uri(XApiEndpoints.BaseUrl))["lang"]?.Value);
+        config.DefaultRequestHeaders.Add("x-twitter-client-language",
+            cookie.GetCookies(new Uri(XApiService.BaseUrl))["lang"]?.Value);
     });
 
     // 设置 Cookie
@@ -124,67 +144,4 @@ static void AddHttpClient(ServiceCollection serviceCollection, CookieContainer c
 
     // 弹性
     httpClientBuilder.AddStandardResilienceHandler();
-}
-
-static async Task<string> GetUserId(ILogger logger, HttpClient httpClient, string username, CancellationToken cancel)
-{
-    // 参数
-    var variables = JsonSerializer.Serialize(new ProfileSpotlightsQueryVariables { ScreenName = username },
-        AppJsonSerializerContext.Default.ProfileSpotlightsQueryVariables);
-
-    // 请求
-    var request = new HttpRequestMessage(HttpMethod.Get, $"{XApiEndpoints.ProfileSpotlightsUrl}?variables={variables}");
-
-    // 发送请求
-    var response = await httpClient.SendAsync(request, cancel);
-
-    // 解析回应
-    var content = await response.Content.ReadFromJsonAsync<GraphQlResponse>(
-        AppJsonSerializerContext.Default.GraphQlResponse, cancel);
-
-    // 获取用户 Id
-    var userId = content?.Data.UserResultByScreenName.Result.RestId;
-
-    if (userId == null)
-    {
-        throw new Exception("无法获取目标用户 ID");
-    }
-
-    return userId;
-}
-
-static async Task GetAllMedia(ILogger logger, HttpClient httpClient, string userId, CancellationToken cancel)
-{
-    var cursor = "";
-    var count = 20;
-
-    while (true)
-    {
-    }
-    
-}
-
-static async Task<List<Tweet>> GetMedia(ILogger logger, HttpClient httpClient, string userId, int count, string cursor, CancellationToken cancel)
-{
-    // 参数
-    var variables = JsonSerializer.Serialize(new UserMediaQueryVariables
-    {
-        UserId = userId,
-        Count = count,
-        IncludePromotedContent = false,
-        WithClientEventToken = false,
-        WithBirdwatchNotes = false,
-        WithVoice = true,
-        WithV2Timeline = true,
-        Cursor = cursor
-    }, AppJsonSerializerContext.Default.UserMediaQueryVariables);
-
-    var features = JsonSerializer.Serialize(new BookmarkFeatures(), AppJsonSerializerContext.Default.BookmarkFeatures);
-
-    // 请求
-    var request = new HttpRequestMessage(HttpMethod.Get,
-        $"{XApiEndpoints.UserMediaUrl}?variables={variables}&features={features}&fieldToggles={{\"withArticlePlainText\":false}}");
-
-    // 发送请求
-    var response = await httpClient.SendAsync(request, cancel);
 }
