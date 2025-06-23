@@ -11,10 +11,12 @@ namespace XMediaDownloader;
 
 public class XApiService(ILogger<XApiService> logger, StorageService storage, [FromKeyedServices("Api")] HttpClient httpClient)
 {
-    // API 信息
-    private const string UserByScreenNameUrl = "/i/api/graphql/1VOOyvKkiI3FMmkeDNxM9A/UserByScreenName";
-    private const string UserMediaUrl = "/i/api/graphql/BGmkmGDG0kZPM-aoQtNTTw/UserMedia";
+    // API 端点
+    public const string BaseUrl = "https://x.com/i/api/graphql";
+    private const string UserByScreenNameUrl = "/1VOOyvKkiI3FMmkeDNxM9A/UserByScreenName";
+    private const string UserMediaUrl = "/BGmkmGDG0kZPM-aoQtNTTw/UserMedia";
 
+    #region Features
     private const string UserByScreenNameFeatures =
         "{\"creator_subscriptions_tweet_preview_api_enabled\":true," +
         "\"hidden_profile_subscriptions_enabled\":true," +
@@ -28,7 +30,6 @@ public class XApiService(ILogger<XApiService> logger, StorageService storage, [F
         "\"subscriptions_verification_info_is_identity_verified_enabled\":true," +
         "\"subscriptions_verification_info_verified_since_enabled\":true," +
         "\"verified_phone_label_enabled\":false}";
-
     private const string UserMediaFeatures =
         "{\"profile_label_improvements_pcf_label_in_post_enabled\":false," +
         "\"rweb_tipjar_consumption_enabled\":true," +
@@ -58,7 +59,8 @@ public class XApiService(ILogger<XApiService> logger, StorageService storage, [F
         "\"longform_notetweets_rich_text_read_enabled\":true," +
         "\"longform_notetweets_inline_media_enabled\":true," +
         "\"responsive_web_enhance_cards_enabled\":false}";
-
+    #endregion
+    
     private const string TimeFormat = "ddd MMM dd HH:mm:ss zzz yyyy";
 
     // 主要方法
@@ -93,7 +95,7 @@ public class XApiService(ILogger<XApiService> logger, StorageService storage, [F
         return user;
     }
 
-    public async Task GetMediaAsync(string userId, CancellationToken cancel)
+    public async Task GetUserMediaAsync(string userId, CancellationToken cancel)
     {
         var data = storage.Content.Users[userId];
         var tweets = data.Tweets;
@@ -111,7 +113,7 @@ public class XApiService(ILogger<XApiService> logger, StorageService storage, [F
             cancel.ThrowIfCancellationRequested();
             
             // 获取媒体
-            var (newTweets, nextCursor) = await GetMediaAsync(userId, cursor, 20, cancel);
+            var (newTweets, nextCursor) = await GetUserMediaAsync(userId, cursor, 20, cancel);
 
             // 如果没有更多媒体则退出
             if (newTweets.Count == 0) break;
@@ -146,7 +148,7 @@ public class XApiService(ILogger<XApiService> logger, StorageService storage, [F
         logger.LogInformation("信息获取完成: 成功获取 {TweetCount} 条帖子 / {MediaCount} 个媒体", tweetCount, mediaCount);
     }
 
-    private async Task<(List<Tweet>, string)> GetMediaAsync(string userId, string cursor, int count, CancellationToken cancel)
+    private async Task<(List<Tweet>, string)> GetUserMediaAsync(string userId, string cursor, int count, CancellationToken cancel)
     {
         // 参数
         var variables = JsonSerializer.Serialize(new UserMediaVariables { UserId = userId, Cursor = cursor, Count = count },

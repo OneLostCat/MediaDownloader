@@ -27,7 +27,7 @@ public class MainService(
             // 获取媒体信息
             if (!args.WithoutDownloadInfo)
             {
-                await api.GetMediaAsync(user.Id, cancel);
+                await api.GetUserMediaAsync(user.Id, cancel);
             }
 
             // 下载媒体

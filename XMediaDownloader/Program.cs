@@ -131,13 +131,15 @@ static async Task Main(string username, FileInfo cookieFile, string outputPath, 
 
 static async Task AddHttpClient(IServiceCollection services, FileInfo cookieFile, CancellationToken cancel)
 {
-    var baseUrl = new Uri("https://x.com");
+    var baseUrl = new Uri(XApiService.BaseUrl);
     const string userAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 Edg/137.0.0.0";
 
     // 加载 Cookie
     var cookie = new CookieContainer();
     var cookieString = await File.ReadAllTextAsync(cookieFile.Name, cancel);
+    
+    services.AddSingleton(cookie);
 
     foreach (var cookieItem in cookieString.Split(';', StringSplitOptions.TrimEntries))
     {
@@ -148,26 +150,8 @@ static async Task AddHttpClient(IServiceCollection services, FileInfo cookieFile
             cookie.Add(baseUrl, new Cookie(cookiePair[0], cookiePair[1]));
         }
     }
-
-    services.AddSingleton(cookie);
-
-    // 下载
-    var download = services.AddHttpClient("Download").AddAsKeyed();
-
-    download.ConfigureHttpClient(config =>
-    {
-        // 启用 HTTP/2 和 HTTP/3
-        config.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
-
-        // 添加 User Agent
-        config.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
-    });
-
-    // 添加弹性
-    download.AddStandardResilienceHandler();
-
-
-    // API
+    
+    // API HttpClient
     var api = services.AddHttpClient("Api").AddAsKeyed();
 
     api.ConfigureHttpClient((services, config) =>
@@ -196,4 +180,20 @@ static async Task AddHttpClient(IServiceCollection services, FileInfo cookieFile
 
     // 添加弹性
     api.AddStandardResilienceHandler();
+
+    // 下载 HttpClient
+    var download = services.AddHttpClient("Download").AddAsKeyed();
+
+    download.ConfigureHttpClient(config =>
+    {
+        // 启用 HTTP/2 和 HTTP/3
+        config.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
+
+        // 添加 User Agent
+        config.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
+    });
+
+    // 添加弹性
+    download.AddStandardResilienceHandler();
+    
 }
