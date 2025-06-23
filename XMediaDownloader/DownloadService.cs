@@ -21,7 +21,7 @@ public class DownloadService(
         var mediaCount = 0; // 当前媒体数量
         var downloadCount = 0; // 下载媒体数量
 
-        logger.LogInformation("开始下载媒体: 总计 {TweetCount} 条帖子 / {MediaCount} 个媒体", tweets.Count, totalMediaCount);
+        logger.LogInformation("开始下载媒体");
 
         // 遍历帖子
         foreach (var tweet in tweets.Select(x => x.Value))
