@@ -96,7 +96,7 @@ public class DownloadService(
                 }
 
                 logger.LogInformation("  {Type} {Url} -> {Filename} ({mediaCount} / {totalMediaCount})", media.Type, url,
-                    file.Name, mediaCount, totalMediaCount);
+                    file, mediaCount, totalMediaCount);
 
                 // 增加下载计数
                 downloadCount++;
