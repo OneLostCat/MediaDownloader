@@ -5,38 +5,39 @@ using XMediaDownloader.Models;
 
 namespace XMediaDownloader;
 
-public class StorageService(ILogger<StorageService> logger)
+public class StorageService(ILogger<StorageService> logger, CommandLineArguments args)
 {
-    private const string FilePath = "storage.json";
-
-    private readonly JsonSerializerOptions _jsonSerializerOptions = new()
+    private static readonly JsonSerializerOptions JsonSerializerOptions = new()
     {
         TypeInfoResolver = StorageContentContext.Default,
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         WriteIndented = true
     };
-
-    // 使用降序排列
-    public static readonly Comparer<string> IdComparer =
-        Comparer<string>.Create((a, b) => string.Compare(b, a, StringComparison.Ordinal));
-
+    
+    public static readonly Comparer<string> IdComparer = Comparer<string>.Create((a, b) => 
+        string.Compare(b, a, StringComparison.Ordinal)); // 使用降序排列
+    
+    private readonly string _dirPath = args.StorageDir.Name;
+    private readonly string _filePath = Path.Combine(args.StorageDir.Name, "storage.json");
+    
     // 公开成员
-    public StorageContent Content { get; set; } = new();
+    public StorageContent Content { get; private set; } = new();
 
     public async Task SaveAsync()
     {
         try
         {
             // 创建目录
-            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(FilePath))!); // 使用 ! 禁用警告
+            Directory.CreateDirectory(_dirPath);
+            
 
             // 打开文件
-            await using var fs = File.Create(FilePath); // 使用 File.Create 覆盖文件
+            await using var fs = File.Create(_filePath); // 使用 File.Create 覆盖文件
 
             // 序列化并写入文件
 #pragma warning disable IL2026
 #pragma warning disable IL3050
-            await JsonSerializer.SerializeAsync(fs, Content, _jsonSerializerOptions);
+            await JsonSerializer.SerializeAsync(fs, Content, JsonSerializerOptions);
 #pragma warning restore IL3050
 #pragma warning restore IL2026
 
@@ -50,7 +51,7 @@ public class StorageService(ILogger<StorageService> logger)
 
     public async Task LoadAsync()
     {
-        if (!File.Exists(FilePath))
+        if (!File.Exists(_filePath))
         {
             logger.LogDebug("数据文件不存在，无法加载数据");
             return;
@@ -59,12 +60,12 @@ public class StorageService(ILogger<StorageService> logger)
         try
         {
             // 打开文件
-            await using var fs = File.OpenRead(FilePath);
+            await using var fs = File.OpenRead(_filePath);
 
             // 读取并反序列化文件
 #pragma warning disable IL2026
 #pragma warning disable IL3050
-            if (await JsonSerializer.DeserializeAsync(fs, typeof(StorageContent), _jsonSerializerOptions) is not StorageContent data)
+            if (await JsonSerializer.DeserializeAsync(fs, typeof(StorageContent), JsonSerializerOptions) is not StorageContent data)
 #pragma warning restore IL3050
 #pragma warning restore IL2026
             {
@@ -86,56 +87,4 @@ public class StorageService(ILogger<StorageService> logger)
             logger.LogError(exception, "数据加载失败");
         }
     }
-
-    // public void AddUserData(string userId, string cursor, List<Tweet> tweets)
-    // {
-    //     // 处理推文
-    //     var newData = new UserData { CurrentCursor = cursor, Users = new Dictionary<string, UserDataItem>() };
-    //
-    //     var users = Content.Users;
-    //
-    //     foreach (var tweet in tweets)
-    //     {
-    //         // 使用 Tweet 的用户 ID 找到对应的用户信息
-    //         var tweetUserId = tweet.UserId;
-    //
-    //         if (!users.TryGetValue(tweetUserId, out var user)) continue;
-    //
-    //         if (!newData.Users.TryGetValue(tweetUserId, out var userDataItem))
-    //         {
-    //             userDataItem = new UserDataItem { UserHistory = new Dictionary<string, User> { [user.Id] = user }, };
-    //
-    //             newData.Users[tweetUserId] = userDataItem;
-    //         }
-    //
-    //         userDataItem.Tweets[tweet.Id] = tweet;
-    //     }
-    //
-    //     // 合并推文
-    //     var data = Content.Data.GetValueOrDefault(userId) ?? new UserData();
-    //
-    //     data.CurrentCursor = newData.CurrentCursor;
-    //
-    //     foreach (var (newUserId, newUserData) in newData.Users)
-    //     {
-    //         // 创建用户
-    //         if (!data.Users.TryGetValue(newUserId, out var userDataItem))
-    //         {
-    //             data.Users[newUserId] = newUserData;
-    //             continue;
-    //         }
-    //
-    //         // 合并用户历史
-    //         foreach (var pair in newUserData.UserHistory)
-    //         {
-    //             userDataItem.UserHistory[pair.Key] = pair.Value;
-    //         }
-    //
-    //         // 合并推文
-    //         foreach (var pair in newUserData.Tweets)
-    //         {
-    //             data.Users[newUserId].Tweets[pair.Key] = pair.Value;
-    //         }
-    //     }
-    // }
 }

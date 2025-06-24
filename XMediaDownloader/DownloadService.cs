@@ -77,7 +77,7 @@ public class DownloadService(
                 }
 
                 // 检查下载类型
-                if (!args.MediaType.HasFlag(media.Type))
+                if (!args.DownloadType.HasFlag(media.Type))
                 {
                     logger.LogInformation("  {Type} {Url} 跳过 ({mediaCount} / {totalMediaCount})", media.Type, url, mediaCount,
                         totalMediaCount);

@@ -1,11 +1,13 @@
-﻿namespace XMediaDownloader.Models;
+﻿using Serilog.Events;
 
-public record CommandLineArguments
-{
-    public required string Username { get; init; }
-    public required FileInfo CookieFile { get; init; }
-    public required string OutputPath { get; init; }
-    public required MediaType MediaType { get; init; }
-    public required bool WithoutDownloadInfo { get; init; }
-    public required bool WithoutDownloadMedia { get; init; }
-}
+namespace XMediaDownloader.Models;
+
+public record CommandLineArguments(
+    string Username,
+    FileInfo CookieFile,
+    string OutputPath,
+    MediaType DownloadType,
+    bool WithoutDownloadInfo,
+    bool WithoutDownloadMedia,
+    DirectoryInfo StorageDir,
+    LogEventLevel LogLevel);
