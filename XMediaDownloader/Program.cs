@@ -11,7 +11,7 @@ using XMediaDownloader.Models;
 // 主命令
 // 信息获取选项
 var usernameOption = new Option<string>("-u", "--username") { Description = "目标用户", Required = true };
-var cookieFileOption = new Option<FileInfo>("-c", "--cookie-file") { Description = "用于访问 API 的 Cookie 文件", Required = true };
+var cookieFileOption = new Option<FileInfo>("-c", "--cookie-file") { Description = "用于请求 API 的 Cookie 文件", Required = true };
 
 // 下载选项
 var outputPathFormatOption = new Option<string>("-o", "--output-path-format")
@@ -22,21 +22,21 @@ var outputPathFormatOption = new Option<string>("-o", "--output-path-format")
 
 var downloadTypeOption = new Option<List<MediaType>>("-t", "--download-type")
 {
-    Description = "媒体下载类",
+    Description = "目标媒体类型",
     DefaultValueFactory = _ => [MediaType.All],
     Arity = ArgumentArity.OneOrMore,
     AllowMultipleArgumentsPerToken = true
 };
 
 var withoutDownloadInfoOption = new Option<bool>("--without-download-info")
-    { Description = "不下载信息", DefaultValueFactory = _ => false };
+    { Description = "无需获取信息", DefaultValueFactory = _ => false };
 
 var withoutDownloadMediaOption = new Option<bool>("--without-download-media")
-    { Description = "不下载媒体", DefaultValueFactory = _ => false };
+    { Description = "无需下载媒体", DefaultValueFactory = _ => false };
 
 // 其他选项
 var storageDirOption = new Option<DirectoryInfo>("-s", "--storage-dir")
-    { Description = "存储目录", DefaultValueFactory = _ => new DirectoryInfo(".") };
+    { Description = "状态存储目录", DefaultValueFactory = _ => new DirectoryInfo(".") };
 
 var logLevelOption = new Option<LogEventLevel>("-l", "--log-level")
     { Description = "日志级别", DefaultValueFactory = _ => LogEventLevel.Information };
@@ -68,7 +68,7 @@ command.SetAction((result, cancel) => Run(
 // 文件路径转换
 var originPathFormatOption = new Option<string>("--origin-path-format") { Description = "原始路径格式", Required = true };
 
-var convertCommand = new Command("convert", "文件路径格式转换工具")
+var convertCommand = new Command("convert", "X 媒体路径格式转换工具")
 {
     usernameOption,
     cookieFileOption,
@@ -109,25 +109,32 @@ async Task Run(string username, FileInfo cookieFile, string outputPath, MediaTyp
         .CreateLogger();
 
     Log.Logger = logger;
-
+    
     logger.Information("---------- X 媒体下载工具 ----------");
 
-    // 主机
-    var builder = Host.CreateApplicationBuilder(args);
+    try
+    {
+        // 主机
+        var builder = Host.CreateApplicationBuilder(args);
 
-    // 命令行参数
-    builder.Services.AddSingleton(new CommandLineArguments(username, cookieFile, outputPath, downloadType,
-        withoutDownloadInfo, withoutDownloadMedia, storageDir, logLevel));
+        // 命令行参数
+        builder.Services.AddSingleton(new CommandLineArguments(username, cookieFile, outputPath, downloadType,
+            withoutDownloadInfo, withoutDownloadMedia, storageDir, logLevel));
 
-    builder.Services.AddSerilog();
-    builder.Services.AddSingleton<XApiService>();
-    builder.Services.AddSingleton<StorageService>();
-    builder.Services.AddSingleton<DownloadService>();
-    builder.Services.AddHostedService<MainService>();
-    await AddHttpClient(builder.Services, cookieFile, cancel);
+        builder.Services.AddSerilog();
+        builder.Services.AddSingleton<XApiService>();
+        builder.Services.AddSingleton<StorageService>();
+        builder.Services.AddSingleton<DownloadService>();
+        builder.Services.AddHostedService<MainService>();
+        await AddHttpClient(builder.Services, cookieFile, cancel);
 
-    await builder.Build().RunAsync(cancel);
-
+        await builder.Build().RunAsync(cancel);
+    }
+    catch (Exception exception)
+    {
+        logger.Fatal(exception, "错误");
+    }
+    
     logger.Debug("应用退出");
 }
 

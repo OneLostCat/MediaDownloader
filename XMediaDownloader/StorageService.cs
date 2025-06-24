@@ -13,13 +13,13 @@ public class StorageService(ILogger<StorageService> logger, CommandLineArguments
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         WriteIndented = true
     };
-    
-    public static readonly Comparer<string> IdComparer = Comparer<string>.Create((a, b) => 
+
+    public static readonly Comparer<string> IdComparer = Comparer<string>.Create((a, b) =>
         string.Compare(b, a, StringComparison.Ordinal)); // 使用降序排列
-    
+
     private readonly string _dirPath = args.StorageDir.Name;
     private readonly string _filePath = Path.Combine(args.StorageDir.Name, "storage.json");
-    
+
     // 公开成员
     public StorageContent Content { get; private set; } = new();
 
@@ -29,7 +29,7 @@ public class StorageService(ILogger<StorageService> logger, CommandLineArguments
         {
             // 创建目录
             Directory.CreateDirectory(_dirPath);
-            
+
 
             // 打开文件
             await using var fs = File.Create(_filePath); // 使用 File.Create 覆盖文件

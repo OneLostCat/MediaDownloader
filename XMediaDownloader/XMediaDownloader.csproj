@@ -7,6 +7,12 @@
         <Nullable>enable</Nullable>
         <PublishAot>true</PublishAot>
         <InvariantGlobalization>true</InvariantGlobalization>
+        <Title>XMediaDownloader</Title>
+        <Authors>OneLostCat</Authors>
+        <Description>XMediaDownloader</Description>
+        <Copyright>© 2025 OneLostCat</Copyright>
+        <AssemblyVersion>1.0.0</AssemblyVersion>
+        <FileVersion>1.0.0</FileVersion>
     </PropertyGroup>
     
     <ItemGroup>
