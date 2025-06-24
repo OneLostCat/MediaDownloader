@@ -27,5 +27,5 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: publish
+          name: publish-${{ matrix.os }}
           path: publish
