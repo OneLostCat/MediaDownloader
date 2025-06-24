@@ -17,7 +17,7 @@ var cookieFileOption = new Option<FileInfo>("-c", "--cookie-file") { Description
 var outputPathFormatOption = new Option<string>("-o", "--output-path-format")
 {
     Description = "输出路径格式",
-    DefaultValueFactory = _ => @"{Username}\{Username}-{TweetCreationTime}-{TweetId}-{MediaIndex}.{Extension}"
+    DefaultValueFactory = _ => $"{{Username}}{Path.AltDirectorySeparatorChar}{{Username}}-{{TweetCreationTime}}-{{TweetId}}-{{MediaIndex}}.{{Extension}}"
 };
 
 var downloadTypeOption = new Option<List<MediaType>>("-t", "--download-type")
