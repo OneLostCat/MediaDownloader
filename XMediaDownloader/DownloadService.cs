@@ -85,18 +85,18 @@ public class DownloadService(
                 }
 
                 // 生成路径
-                var filePath = BuildPath(args.OutputPath, user, tweet, i, videoIndex, extension);
+                var file = new FileInfo(BuildPath(args.OutputPath, user, tweet, i, videoIndex, extension));
 
                 // 检查文件是否存在
-                if (File.Exists(filePath))
+                if (file.Exists)
                 {
                     logger.LogInformation("  {Type} {Url} 文件已存在 ({mediaCount} / {totalMediaCount})", media.Type, url, mediaCount,
                         totalMediaCount);
                     continue;
                 }
 
-                logger.LogInformation("  {Type} {Url} -> {FilePath} ({mediaCount} / {totalMediaCount})", media.Type, url,
-                    filePath, mediaCount, totalMediaCount);
+                logger.LogInformation("  {Type} {Url} -> {Filename} ({mediaCount} / {totalMediaCount})", media.Type, url,
+                    file.Name, mediaCount, totalMediaCount);
 
                 // 增加下载计数
                 downloadCount++;
@@ -105,15 +105,16 @@ public class DownloadService(
                 var response = await httpClient.GetAsync(url, cancel);
 
                 // 创建文件夹
-                Directory.CreateDirectory(Path.GetDirectoryName(filePath) ?? "");
+                file.Directory?.Create(); // 无法判断是否为空
 
                 // 写入临时文件
-                var temp = Path.GetTempFileName();
-                await using (var fs = File.Create(temp))
+                var tempFile = new FileInfo(Path.GetTempFileName());
+                
+                await using (var fs = tempFile.Create())
                     await response.Content.CopyToAsync(fs, CancellationToken.None); // 不传递取消令牌，避免下载操作只执行一半
 
                 // 移动文件
-                File.Move(temp, filePath);
+                tempFile.MoveTo(file.FullName);
             }
         }
 
