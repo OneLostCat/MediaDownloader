@@ -1,4 +1,5 @@
-﻿using System.Text.Encodings.Web;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using XMediaDownloader.Models;
@@ -23,6 +24,9 @@ public class StorageService(ILogger<StorageService> logger, CommandLineArguments
     // 公开成员
     public StorageContent Content { get; private set; } = new();
 
+    // 抑制 JsonSerializer.SerializeAsync 的警告
+    [UnconditionalSuppressMessage("AOT", "IL3050:Calling members annotated with 'RequiresDynamicCodeAttribute' may break functionality when AOT compiling.", Justification = "<Pending>")]
+    [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
     public async Task SaveAsync()
     {
         try
@@ -34,11 +38,7 @@ public class StorageService(ILogger<StorageService> logger, CommandLineArguments
             await using var fs = _file.Create(); // 使用 Create 覆盖文件
 
             // 序列化并写入文件
-#pragma warning disable IL2026
-#pragma warning disable IL3050
             await JsonSerializer.SerializeAsync(fs, Content, JsonSerializerOptions);
-#pragma warning restore IL3050
-#pragma warning restore IL2026
 
             logger.LogDebug("数据保存成功");
         }
@@ -48,6 +48,9 @@ public class StorageService(ILogger<StorageService> logger, CommandLineArguments
         }
     }
 
+    // 抑制 JsonSerializer.DeserializeAsync 的警告
+    [UnconditionalSuppressMessage("AOT", "IL3050:Calling members annotated with 'RequiresDynamicCodeAttribute' may break functionality when AOT compiling.", Justification = "<Pending>")]
+    [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
     public async Task LoadAsync()
     {
         if (!_file.Exists)
@@ -62,12 +65,8 @@ public class StorageService(ILogger<StorageService> logger, CommandLineArguments
             await using var fs = _file.OpenRead();
 
             // 读取并反序列化文件
-#pragma warning disable IL2026
-#pragma warning disable IL3050
             if (await JsonSerializer.DeserializeAsync(fs, typeof(StorageContent), JsonSerializerOptions) is not StorageContent
                 data)
-#pragma warning restore IL3050
-#pragma warning restore IL2026
             {
                 logger.LogError("数据加载失败");
                 return;
