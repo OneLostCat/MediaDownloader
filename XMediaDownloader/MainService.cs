@@ -95,13 +95,15 @@ public class MainService(
     private void OutputArgumentsInfo()
     {
         logger.LogInformation("参数:");
-        logger.LogInformation("  目标用户: {User}", args.Username);
+        logger.LogInformation("  目标用户: {Username}", args.Username);
         logger.LogInformation("  Cookie 文件: {CookieFile}", args.CookieFile);
-        logger.LogInformation("  输出路径格式: {Dirname}", args.OutputPath);
+        logger.LogInformation("  输出目录: {OutputDir}", args.OutputDir);
+        logger.LogInformation("  输出路径格式: {OutputPathFormat}", args.OutputPathFormat);
         logger.LogInformation("  目标媒体类型: {DownloadType}", args.DownloadType.HasFlag(MediaType.All) ? "All" : args.DownloadType);
         logger.LogInformation("  无需获取信息: {OnlyDownloadInfo}", args.WithoutDownloadInfo);
         logger.LogInformation("  无需下载媒体: {OnlyDownloadMedia}", args.WithoutDownloadMedia);
         logger.LogInformation("  状态存储目录: {StorageDir}", args.StorageDir);
+        // logger.LogInformation("  工作目录: {WorkDir}", args.WorkDir);
         logger.LogInformation("  日志级别: {LogLevel}", args.LogLevel);
     }
 }

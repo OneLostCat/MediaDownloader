@@ -46,6 +46,7 @@ public class DownloadService(
                 string url;
                 string extension;
                 int? videoIndex = null;
+                Video? video = null;
 
                 if (media.Type != MediaType.Video) // 图片或动图
                 {
@@ -69,8 +70,11 @@ public class DownloadService(
                         .First()
                         .Index;
 
+                    // 获取视频
+                    video = media.Video[(int)videoIndex];
+
                     // 获取视频 Url
-                    url = media.Video[(int)videoIndex].Url; // 强制转换避免报错
+                    url = video.Url;
 
                     // 获取拓展名
                     extension = new Uri(url).Segments.Last().Split('.').Last();
@@ -84,19 +88,41 @@ public class DownloadService(
                     continue;
                 }
 
-                // 生成路径
-                var file = new FileInfo(BuildPath(args.OutputPath, user, tweet, i, videoIndex, extension));
+                // 获取文件信息
+                var file = new FileInfo(Path.Combine(
+                    args.OutputDir.ToString() != "." ? args.OutputDir.ToString() : "", // 避免使用默认目录时输出多余的 ".\"
+                    PathBuilder.Build(
+                        args.OutputPathFormat,
+                        user.Id,
+                        user.Name,
+                        user.Nickname,
+                        user.Description,
+                        user.CreationTime,
+                        user.MediaCount,
+                        tweet.Id,
+                        tweet.CreationTime,
+                        tweet.Text,
+                        tweet.Hashtags,
+                        i + 1,
+                        media.Type,
+                        media.Url,
+                        videoIndex,
+                        video?.Url,
+                        video?.Bitrate,
+                        extension
+                    )
+                ));
 
                 // 检查文件是否存在
                 if (file.Exists)
                 {
-                    logger.LogInformation("  {Type} {Url} 文件已存在 ({mediaCount} / {totalMediaCount})", media.Type, url, mediaCount,
-                        totalMediaCount);
+                    logger.LogInformation("  {Type} {Url} 文件已存在 {FilePath} ({mediaCount} / {totalMediaCount})", media.Type, url,
+                        file, mediaCount, totalMediaCount);
                     continue;
                 }
 
-                logger.LogInformation("  {Type} {Url} -> {Filename} ({mediaCount} / {totalMediaCount})", media.Type, url,
-                    file, mediaCount, totalMediaCount);
+                logger.LogInformation("  {Type} {Url} -> {FilePath} ({mediaCount} / {totalMediaCount})", media.Type, url, file,
+                    mediaCount, totalMediaCount);
 
                 // 增加下载计数
                 downloadCount++;
@@ -109,7 +135,7 @@ public class DownloadService(
 
                 // 写入临时文件
                 var tempFile = new FileInfo(Path.GetTempFileName());
-                
+
                 await using (var fs = tempFile.Create())
                     await response.Content.CopyToAsync(fs, CancellationToken.None); // 不传递取消令牌，避免下载操作只执行一半
 
@@ -119,61 +145,5 @@ public class DownloadService(
         }
 
         logger.LogInformation("媒体下载完成: 成功下载 {DownloadCount} / {TotalMediaCount}", downloadCount, totalMediaCount);
-    }
-
-    // 工具方法
-    // 生成路径
-    private static readonly Dictionary<string, string> Placeholders = new()
-    {
-        { "UserId", "0" },
-        { "Username", "1" },
-        // { "UserNickname", "2" }, TODO
-        // { "UserDescription", "3" }, TODO
-        { "UserCreationTime", "4" },
-        { "UserMediaCount", "5" },
-        { "TweetId", "6" },
-        { "TweetCreationTime", "7" },
-        // { "TweetText", "8" }, TODO
-        // { "TweetHashtags", "9" }, TODO
-        { "MediaIndex", "10" },
-        { "MediaType", "11" },
-        // { "MediaUrl", "12" }, TODO
-        { "VideoIndex", "13" },
-        // { "VideoUrl", "14" }, TODO
-        { "VideoBitrate", "15" },
-        { "Extension", "16" },
-        // 设置默认时间格式
-        { "{4}", "{4:yyyy-MM-dd_HH-mm-ss}" },
-        { "{7}", "{7:yyyy-MM-dd_HH-mm-ss}" }
-    };
-
-    private static string BuildPath(string format, User user, Tweet tweet, int mediaIndex, int? videoIndex, string extension)
-    {
-        var sb = new StringBuilder(format);
-
-        // 替换占位符
-        foreach (var pair in Placeholders) sb.Replace(pair.Key, pair.Value);
-
-        // 生成路径
-        return string.Format(
-            sb.ToString(),
-            user.Id,
-            user.Name,
-            user.Nickname,
-            user.Description,
-            user.CreationTime,
-            user.MediaCount,
-            tweet.Id,
-            tweet.CreationTime,
-            tweet.Text,
-            tweet.Hashtags,
-            mediaIndex,
-            tweet.Media[mediaIndex].Type.ToString().ToLower(),
-            tweet.Media[mediaIndex].Url,
-            videoIndex != null ? videoIndex : "",
-            videoIndex != null ? tweet.Media[mediaIndex].Video[(int)videoIndex].Url : "",
-            videoIndex != null ? tweet.Media[mediaIndex].Video[(int)videoIndex].Bitrate : "",
-            extension
-        );
     }
 }
