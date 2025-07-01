@@ -13,8 +13,11 @@ public class XApiService(ILogger<XApiService> logger, StorageService storage, [F
 {
     // API 端点
     public const string BaseUrl = "https://x.com/i/api/graphql/";
+
     private const string UserByScreenNameUrl = "1VOOyvKkiI3FMmkeDNxM9A/UserByScreenName";
-    private const string UserTweets = "q6xj5bs0hapm9309hexA_g/UserTweets";
+
+    // private const string UserTweets = "q6xj5bs0hapm9309hexA_g/UserTweets";
+    
     private const string UserMediaUrl = "BGmkmGDG0kZPM-aoQtNTTw/UserMedia";
 
     #region Features
@@ -99,9 +102,9 @@ public class XApiService(ILogger<XApiService> logger, StorageService storage, [F
         return user;
     }
 
-    public async Task GetUserTweetsAsync(string userId, CancellationToken cancel)
-    {
-    }
+    // public async Task GetUserTweetsAsync(string userId, CancellationToken cancel)
+    // {
+    // }
 
     public async Task GetUserMediaAsync(string userId, CancellationToken cancel)
     {

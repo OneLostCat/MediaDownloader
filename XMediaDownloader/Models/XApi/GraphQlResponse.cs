@@ -3,7 +3,7 @@
 public record GraphQlResponse<T>
 {
     public T? Data { get; set; }
-    public GraphQlResponseErrors? Errors { get; set; }
+    public List<GraphQlResponseErrors> Errors { get; set; } = [];
 }
 
 public record GraphQlResponseErrors
