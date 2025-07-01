@@ -1,9 +1,8 @@
-﻿using System.Text;
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using XMediaDownloader.Models;
 
-namespace XMediaDownloader;
+namespace XMediaDownloader.Services;
 
 public class DownloadService(
     ILogger<DownloadService> logger,

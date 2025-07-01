@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 using XMediaDownloader.Models;
 using XMediaDownloader.Models.XApi;
 
-namespace XMediaDownloader;
+namespace XMediaDownloader.Services;
 
 public class XApiService(ILogger<XApiService> logger, StorageService storage, [FromKeyedServices("Api")] HttpClient httpClient)
 {

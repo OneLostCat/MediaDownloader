@@ -4,7 +4,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using XMediaDownloader.Models;
 
-namespace XMediaDownloader;
+namespace XMediaDownloader.Services;
 
 public class StorageService(ILogger<StorageService> logger, CommandLineArguments args)
 {
@@ -15,8 +15,7 @@ public class StorageService(ILogger<StorageService> logger, CommandLineArguments
         WriteIndented = true
     };
 
-    public static readonly Comparer<string> IdComparer = Comparer<string>.Create((a, b) =>
-        string.Compare(b, a, StringComparison.Ordinal)); // 使用降序排列
+
 
     private readonly DirectoryInfo _dir = args.StorageDir;
     private readonly FileInfo _file = new(Path.Combine(args.StorageDir.FullName, "storage.json"));
@@ -75,7 +74,7 @@ public class StorageService(ILogger<StorageService> logger, CommandLineArguments
             // 将帖子转换成降序排列
             foreach (var pair in data.Users)
             {
-                pair.Value.Tweets = new SortedDictionary<string, Tweet>(pair.Value.Tweets, IdComparer);
+                pair.Value.Tweets = new SortedDictionary<string, Tweet>(pair.Value.Tweets, StorageContent.IdComparer);
             }
 
             logger.LogDebug("数据加载成功");

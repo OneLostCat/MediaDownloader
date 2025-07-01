@@ -2,7 +2,7 @@
 using Microsoft.Extensions.Logging;
 using XMediaDownloader.Models;
 
-namespace XMediaDownloader;
+namespace XMediaDownloader.Services;
 
 public class MainService(
     CommandLineArguments args,
@@ -38,7 +38,7 @@ public class MainService(
         }
         catch (OperationCanceledException)
         {
-            logger.LogInformation("任务取消");
+            logger.LogInformation("操作取消");
         }
         catch (Exception exception)
         {

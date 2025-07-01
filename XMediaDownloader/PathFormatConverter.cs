@@ -1,25 +1,26 @@
-﻿using System.Globalization;
+﻿using System.CommandLine;
+using System.Globalization;
 using System.Text.RegularExpressions;
 using Serilog;
-using Serilog.Events;
 using XMediaDownloader.Models;
 
 namespace XMediaDownloader;
 
 public static partial class PathFormatConverter
 {
-    public static async Task Run(
-        DirectoryInfo sourceDir, 
-        DirectoryInfo outputDir, 
-        string outputPathFormat, 
-        bool dryRun,
-        // DirectoryInfo workDir, 
-        LogEventLevel logLevel, 
-        CancellationToken cancel)
+    public static async Task Run(ParseResult result, CancellationToken cancel)
     {
+        // 获取参数
+        var sourceDir = result.GetRequiredValue(CommandLine.SourceDirOption);
+        var outputDir = result.GetRequiredValue(CommandLine.OutputDirOption);
+        var outputPathFormat = result.GetRequiredValue(CommandLine.OutputPathFormatOption);
+        var dryRun = result.GetRequiredValue(CommandLine.DryRunOption);
+        // var workDir = result.GetRequiredValue(CommandLine.WorkDirOption);
+        var logLevel = result.GetRequiredValue(CommandLine.LogLevelOption);
+
         // 设置工作目录
         // Environment.CurrentDirectory = workDir.FullName;
-        
+
         // 日志
         await using var logger = new LoggerConfiguration()
             .WriteTo.Console(outputTemplate: "[{Level:u3}] {Message:lj}{NewLine}{Exception}")
@@ -29,6 +30,7 @@ public static partial class PathFormatConverter
 
         Log.Logger = logger;
 
+        // 输出启动信息
         logger.Information("---------- 路径格式转换工具 ----------");
         logger.Information("参数:");
         logger.Information("  源目录: {OriginDir}", sourceDir);
@@ -38,12 +40,10 @@ public static partial class PathFormatConverter
         // logger.Information("  工作目录: {WorkDir}", workDir);
         logger.Information("  日志级别: {LogLevel}", logLevel);
 
+        // 转换
         logger.Information("开始转换");
 
-        // 遍历文件
-        var sources = sourceDir.EnumerateFiles("*", SearchOption.AllDirectories);
-
-        foreach (var source in sources)
+        foreach (var source in sourceDir.EnumerateFiles("*", SearchOption.AllDirectories))
         {
             // 检查是否取消
             cancel.ThrowIfCancellationRequested();
@@ -57,6 +57,7 @@ public static partial class PathFormatConverter
             if (!match.Success)
             {
                 logger.Warning("文件名无效 {SourcePath}", sourcePath);
+                
                 continue;
             }
 
@@ -119,7 +120,7 @@ public static partial class PathFormatConverter
             }
             catch (OperationCanceledException)
             {
-                logger.Information("任务取消");
+                logger.Information("操作取消");
             }
             catch (Exception exception)
             {
