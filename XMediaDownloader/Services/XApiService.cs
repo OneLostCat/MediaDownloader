@@ -113,10 +113,11 @@ public class XApiService(ILogger<XApiService> logger, StorageService storage, [F
 
     public async Task GetUserMediaAsync(string userId, CancellationToken cancel)
     {
+        var users = storage.Content.Users;
         var tweets = storage.Content.Tweets;
         var cursor = storage.Content.CurrentCursor;
 
-        var total = storage.Content.Users[userId].MediaTweetCount; // 总帖子数量
+        var total = users[userId].MediaTweetCount; // 总帖子数量
         var count = tweets.Count; // 当前帖子数量
         var mediaCount = tweets.Values.Sum(tweet => tweet.Media.Count); // 当前媒体数量
 
@@ -135,23 +136,23 @@ public class XApiService(ILogger<XApiService> logger, StorageService storage, [F
 
             foreach (var (user, tweet) in list)
             {
-                // 储存用户
-                storage.Content.Users[user.Id] = user;
-
-                // 储存帖子
-                var isNew = tweets.TryAdd(tweet.Id, tweet);
-
-                // 增加帖子计数
-                if (isNew) count++;
-
+                // 如果为新帖子，增加计数
+                if (!tweets.ContainsKey(tweet.Id))
+                {
+                    count++;
+                    mediaCount += tweet.Media.Count;
+                }
+                
+                // 储存
+                users[user.Id] = user;
+                tweets[tweet.Id] = tweet;
+                
+                // 输出信息
                 logger.LogInformation("获取信息 {Id} {CreationTime:yyyy-MM-dd HH:mm:ss} ({Count} / {Total})", tweet.Id,
                     tweet.CreationTime.LocalDateTime, count, total);
 
                 foreach (var media in tweet.Media)
                 {
-                    // 增加媒体计数
-                    if (isNew) mediaCount++;
-
                     logger.LogInformation("  {Type} {Url}", media.Type, media.Url);
                 }
             }
