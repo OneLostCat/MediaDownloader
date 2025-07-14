@@ -11,8 +11,8 @@ public class StorageService(ILogger<StorageService> logger, CommandLineArguments
     private static readonly JsonSerializerOptions JsonSerializerOptions = new()
     {
         TypeInfoResolver = StorageContentContext.Default,
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-        WriteIndented = true
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
     
     private readonly FileInfo _file = new(Path.Combine(args.OutputDir, "metadata.json"));

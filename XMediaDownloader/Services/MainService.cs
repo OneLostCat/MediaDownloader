@@ -14,6 +14,7 @@ public class MainService(
 {
     protected override async Task ExecuteAsync(CancellationToken cancel)
     {
+        // 输出参数信息
         OutputArgumentsInfo();
 
         // 加载数据
@@ -21,12 +22,15 @@ public class MainService(
 
         try
         {
-            // 获取用户信息
-            var user = await GetUserAsync(cancel);
-
-            // 获取媒体信息
             if (!args.WithoutDownloadInfo)
             {
+                // 获取用户
+                var user = await api.GetUserByScreenNameAsync(args.Username, cancel);
+                
+                // 输出用户信息
+                OutputUserInfo(user);
+                
+                // 获取媒体
                 await api.GetUserMediaAsync(user.Id, cancel);
             }
 
@@ -52,35 +56,6 @@ public class MainService(
         lifetime.StopApplication();
     }
 
-    private async Task<User> GetUserAsync(CancellationToken cancel)
-    {
-        User user;
-
-        if (!args.WithoutDownloadInfo)
-        {
-            // 获取用户信息
-            user = await api.GetUserByScreenNameAsync(args.Username, cancel);
-
-            // 储存用户信息
-            storage.Content.Users[user.Id] = user;
-        }
-        else
-        {
-            // 从存储中获取用户信息
-            user = storage.Content.Users.Select(x => x.Value).First(x => x.Name == args.Username);
-        }
-        
-        logger.LogInformation("用户信息:");
-        logger.LogInformation("  ID: {Id}", user.Id);
-        logger.LogInformation("  名称: {Name}", user.Name);
-        logger.LogInformation("  昵称: {Nickname}", user.Nickname);
-        logger.LogInformation("  描述: {Description}", user.Description);
-        logger.LogInformation("  注册时间: {CreationTime:yyyy-MM-dd HH:mm:ss}", user.CreationTime.LocalDateTime);
-        logger.LogInformation("  媒体数量: {MediaCount}", user.MediaCount);
-
-        return user;
-    }
-
     // 工具方法
     private void OutputArgumentsInfo()
     {
@@ -94,5 +69,16 @@ public class MainService(
         logger.LogInformation("  无需下载媒体: {OnlyDownloadMedia}", args.WithoutDownloadMedia);
         logger.LogInformation("  工作目录: {WorkDir}", args.WorkDir);
         logger.LogInformation("  日志级别: {LogLevel}", args.LogLevel);
+    }
+    
+    private void OutputUserInfo(User user)
+    {
+        logger.LogInformation("用户信息:");
+        logger.LogInformation("  ID: {Id}", user.Id);
+        logger.LogInformation("  名称: {Name}", user.Name);
+        logger.LogInformation("  昵称: {Nickname}", user.Nickname);
+        logger.LogInformation("  描述: {Description}", user.Description);
+        logger.LogInformation("  注册时间: {CreationTime:yyyy-MM-dd HH:mm:ss}", user.CreationTime.LocalDateTime);
+        logger.LogInformation("  媒体帖子数量: {MediaCount}", user.MediaTweetCount);
     }
 }

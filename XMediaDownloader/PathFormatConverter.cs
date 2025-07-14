@@ -66,18 +66,13 @@ public static partial class PathFormatConverter
 
                 // 获取信息
                 var groups = match.Groups;
-
                 var username = groups["Username"].Value;
-
                 var tweetId = groups["TweetId"].Value;
-
                 var tweetCreationTime = new DateTimeOffset(
                     DateTime.ParseExact(groups["TweetCreationTime"].Value, "yyyyMMdd_HHmmss", CultureInfo.InvariantCulture),
                     TimeSpan.FromHours(8)
                 ).ToUniversalTime(); // 将 UTC+8 转换为 UTC
-
                 var mediaIndex = int.Parse(groups["MediaIndex"].Value);
-
                 var mediaType = groups["MediaType"].Value switch
                 {
                     "img" => MediaType.Image,
@@ -85,7 +80,6 @@ public static partial class PathFormatConverter
                     "gif" => MediaType.Gif,
                     _ => throw new ArgumentException("无法识别的媒体类型", groups["MediaType"].Value)
                 };
-
                 var extension = $".{groups["Extension"].Value}";
 
                 // 生成文件路径

@@ -80,7 +80,7 @@ public class DownloadService(
                         user.Nickname,
                         user.Description,
                         user.CreationTime,
-                        user.MediaCount,
+                        user.MediaTweetCount,
                         tweet.Id,
                         tweet.CreationTime,
                         tweet.Text,

@@ -94,17 +94,17 @@ public static class Downloader
 
         services.AddSingleton(cookie);
 
-        foreach (var cookieItem in cookieString.Split(';', StringSplitOptions.TrimEntries))
+        foreach (var item in cookieString.Split(';', StringSplitOptions.TrimEntries))
         {
-            var cookiePair = cookieItem.Split('=');
+            var pair = item.Split('=');
 
-            if (cookiePair.Length == 2)
+            if (pair.Length == 2)
             {
-                cookie.Add(baseUrl, new Cookie(cookiePair[0], cookiePair[1]));
+                cookie.Add(baseUrl, new Cookie(pair[0], pair[1]));
             }
         }
 
-        // API HttpClient
+        // API 客户端
         var api = services.AddHttpClient("Api").AddAsKeyed();
 
         api.ConfigureHttpClient(config =>
@@ -112,7 +112,7 @@ public static class Downloader
             // 配置基础地址
             config.BaseAddress = baseUrl;
 
-            // 添加头
+            // 配置头
             config.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
                 "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA");
 
@@ -132,12 +132,12 @@ public static class Downloader
         // 添加弹性
         api.AddStandardResilienceHandler();
 
-        // 下载 HttpClient
+        // 下载客户端
         var download = services.AddHttpClient("Download").AddAsKeyed();
 
         download.ConfigureHttpClient(config =>
         {
-            // 添加 User Agent
+            // 配置 User Agent
             config.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
 
             // 启用 HTTP/2 和 HTTP/3

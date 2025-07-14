@@ -93,28 +93,32 @@ public class XApiService(ILogger<XApiService> logger, StorageService storage, [F
 
         if (content?.Data == null) throw new Exception("无法获取用户信息"); // 无法判断是否会为空
 
-        // 解析用户信息
+        // 解析用户
         var result = content.Data.User.Result;
-
-        return new User
+        var user = new User
         {
             Id = result.RestId,
             Name = result.Legacy.ScreenName,
             Nickname = result.Legacy.Name,
             Description = result.Legacy.Description,
             CreationTime = DateTimeOffset.ParseExact(result.Legacy.CreatedAt, TimeFormat, CultureInfo.InvariantCulture),
-            MediaCount = result.Legacy.MediaCount
+            MediaTweetCount = result.Legacy.MediaCount
         };
+
+        // 储存用户
+        storage.Content.Users[user.Id] = user;
+
+        return user;
     }
 
     public async Task GetUserMediaAsync(string userId, CancellationToken cancel)
     {
         var tweets = storage.Content.Tweets;
-        var cursor = storage.Content.CurrentCursor; // 当前指针
+        var cursor = storage.Content.CurrentCursor;
 
-        var totalMediaCount = storage.Content.Users[userId].MediaCount; // 总媒体数量
-        var tweetCount = tweets.Count; // 当前帖子数量
-        var mediaCount = tweets.Sum(x => x.Value.Media.Count); // 当前媒体数量
+        var total = storage.Content.Users[userId].MediaTweetCount; // 总帖子数量
+        var count = tweets.Count; // 当前帖子数量
+        var mediaCount = tweets.Values.Sum(tweet => tweet.Media.Count); // 当前媒体数量
 
         logger.LogInformation("开始获取信息");
 
@@ -138,17 +142,17 @@ public class XApiService(ILogger<XApiService> logger, StorageService storage, [F
                 var isNew = tweets.TryAdd(tweet.Id, tweet);
 
                 // 增加帖子计数
-                if (isNew) tweetCount++;
+                if (isNew) count++;
 
-                logger.LogInformation("获取信息 {Id} {CreationTime:yyyy-MM-dd HH:mm:ss}", tweet.Id, tweet.CreationTime.LocalDateTime);
+                logger.LogInformation("获取信息 {Id} {CreationTime:yyyy-MM-dd HH:mm:ss} ({Count} / {Total})", tweet.Id,
+                    tweet.CreationTime.LocalDateTime, count, total);
 
                 foreach (var media in tweet.Media)
                 {
                     // 增加媒体计数
                     if (isNew) mediaCount++;
 
-                    logger.LogInformation("  {Type} {Url} ({MediaCount} / {TotalMediaCount})", media.Type, media.Url, mediaCount,
-                        totalMediaCount);
+                    logger.LogInformation("  {Type} {Url}", media.Type, media.Url);
                 }
             }
 
@@ -159,7 +163,7 @@ public class XApiService(ILogger<XApiService> logger, StorageService storage, [F
             // await Task.Delay(1000, cancel);
         }
 
-        logger.LogInformation("信息获取完成: 成功获取 {TweetCount} 条帖子 / {MediaCount} 个媒体", tweetCount, mediaCount);
+        logger.LogInformation("信息获取完成: 成功获取 {TweetCount} 条帖子，{MediaCount} 个媒体", count, mediaCount);
     }
 
     private async Task<(List<(User, Tweet)> list, string cursor)> GetUserMediaAsync(string userId, string? cursor,
@@ -236,7 +240,7 @@ public class XApiService(ILogger<XApiService> logger, StorageService storage, [F
                 Nickname = userResult.Legacy.Name,
                 Description = userResult.Legacy.Description,
                 CreationTime = DateTimeOffset.ParseExact(userResult.Legacy.CreatedAt, TimeFormat, CultureInfo.InvariantCulture),
-                MediaCount = userResult.Legacy.MediaCount
+                MediaTweetCount = userResult.Legacy.MediaCount
             };
 
             // 解析帖子
@@ -270,7 +274,7 @@ public class XApiService(ILogger<XApiService> logger, StorageService storage, [F
             Nickname = userResult.Legacy.Name,
             Description = userResult.Legacy.Description,
             CreationTime = DateTimeOffset.ParseExact(userResult.Legacy.CreatedAt, TimeFormat, CultureInfo.InvariantCulture),
-            MediaCount = userResult.Legacy.MediaCount
+            MediaTweetCount = userResult.Legacy.MediaCount
         };
 
         // 解析帖子
@@ -305,15 +309,9 @@ public class XApiService(ILogger<XApiService> logger, StorageService storage, [F
     {
         var sb = new StringBuilder(endpoint + $"?variables={variables}");
 
-        if (features != null)
-        {
-            sb.Append($"&features={features}");
-        }
+        if (features != null) sb.Append($"&features={features}");
 
-        if (fieldToggles != null)
-        {
-            sb.Append($"&fieldToggles={fieldToggles}");
-        }
+        if (fieldToggles != null) sb.Append($"&fieldToggles={fieldToggles}");
 
         return sb.ToString();
     }
