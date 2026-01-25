@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XMediaDownloader", "XMediaDownloader\XMediaDownloader.csproj", "{7EFAF6BA-1CD1-4DEB-8863-EEFF3A510F72}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MediaDownloader", "MediaDownloader\MediaDownloader.csproj", "{7EFAF6BA-1CD1-4DEB-8863-EEFF3A510F72}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -1,8 +1,8 @@
-﻿using Microsoft.Extensions.Hosting;
+﻿using MediaDownloader.Models;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using XMediaDownloader.Models;
 
-namespace XMediaDownloader.Services;
+namespace MediaDownloader.Services;
 
 public class MainService(
     CommandLineArguments args,

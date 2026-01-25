@@ -1,8 +1,8 @@
 ﻿using System.CommandLine;
+using MediaDownloader.Models;
 using Serilog.Events;
-using XMediaDownloader.Models;
 
-namespace XMediaDownloader;
+namespace MediaDownloader;
 
 public static class CommandLine
 {

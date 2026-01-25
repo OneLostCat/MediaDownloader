@@ -1,10 +1,10 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using MediaDownloader.Models;
 using Microsoft.Extensions.Logging;
-using XMediaDownloader.Models;
 
-namespace XMediaDownloader.Services;
+namespace MediaDownloader.Services;
 
 public class StorageService(ILogger<StorageService> logger, CommandLineArguments args)
 {

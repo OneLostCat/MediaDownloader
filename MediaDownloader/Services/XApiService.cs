@@ -2,12 +2,12 @@
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using MediaDownloader.Models;
+using MediaDownloader.Models.XApi;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using XMediaDownloader.Models;
-using XMediaDownloader.Models.XApi;
 
-namespace XMediaDownloader.Services;
+namespace MediaDownloader.Services;
 
 public class XApiService(ILogger<XApiService> logger, StorageService storage, [FromKeyedServices("Api")] HttpClient httpClient)
 {
@@ -122,7 +122,7 @@ public class XApiService(ILogger<XApiService> logger, StorageService storage, [F
         var mediaCount = tweets.Values.Sum(tweet => tweet.Media.Count); // 当前媒体数量
 
         logger.LogInformation("开始获取信息");
-
+        
         while (true)
         {
             // 检查是否取消

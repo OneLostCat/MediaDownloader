@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace XMediaDownloader.Models.XApi;
+namespace MediaDownloader.Models.XApi;
 
 public record UserByScreenNameVariables(string ScreenName);
 

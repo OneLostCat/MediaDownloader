@@ -1,7 +1,7 @@
 ﻿using System.Text;
-using XMediaDownloader.Models;
+using MediaDownloader.Models;
 
-namespace XMediaDownloader;
+namespace MediaDownloader;
 
 public static class PathBuilder
 {

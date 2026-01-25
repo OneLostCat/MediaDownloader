@@ -1,4 +1,4 @@
-﻿namespace XMediaDownloader.Models;
+﻿namespace MediaDownloader.Models;
 
 [Flags]
 public enum MediaType

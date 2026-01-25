@@ -1,10 +1,10 @@
 ﻿using System.CommandLine;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using MediaDownloader.Models;
 using Serilog;
-using XMediaDownloader.Models;
 
-namespace XMediaDownloader;
+namespace MediaDownloader;
 
 public static partial class PathFormatConverter
 {

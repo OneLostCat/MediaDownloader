@@ -1,14 +1,14 @@
 ﻿using System.CommandLine;
 using System.Net;
 using System.Net.Http.Headers;
+using MediaDownloader.Models;
+using MediaDownloader.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using Serilog.Events;
-using XMediaDownloader.Models;
-using XMediaDownloader.Services;
 
-namespace XMediaDownloader;
+namespace MediaDownloader;
 
 public static class Downloader
 {
@@ -92,7 +92,7 @@ public static class Downloader
         var cookie = new CookieContainer();
         var cookieString = await File.ReadAllTextAsync(cookieFile, cancel);
 
-        services.AddSingleton(cookie);
+        // services.AddSingleton(cookie);
 
         foreach (var item in cookieString.Split(';', StringSplitOptions.TrimEntries))
         {

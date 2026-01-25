@@ -1,6 +1,6 @@
 ﻿using Serilog.Events;
 
-namespace XMediaDownloader.Models;
+namespace MediaDownloader.Models;
 
 public record CommandLineArguments(
     string Username,
