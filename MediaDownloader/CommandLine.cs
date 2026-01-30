@@ -33,10 +33,10 @@ public static class CommandLine
         { Description = "时间日期格式", DefaultValueFactory = _ => "%Y-%m-%d %H-%M-%S" };
     
     // 下载选项
-    private static readonly Option<List<MediaType>> TypeOption = new("-t", "--type")
+    private static readonly Option<List<DownloadType>> TypeOption = new("-t", "--type")
     {
         Description = "下载媒体类型",
-        DefaultValueFactory = _ => [MediaType.Image, MediaType.Video, MediaType.Gif],
+        DefaultValueFactory = _ => [DownloadType.Image, DownloadType.Video, DownloadType.Gif],
         AllowMultipleArgumentsPerToken = true,
         Arity = ArgumentArity.OneOrMore
     };

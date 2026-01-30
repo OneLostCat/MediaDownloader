@@ -1,6 +1,6 @@
 ﻿namespace MediaDownloader.Models;
 
-public enum MediaType
+public enum DownloadType
 {
     Image,
     Video,

@@ -28,7 +28,7 @@ public class HttpDownloader(ILogger<HttpDownloader> logger, CommandLineOptions o
     }
 
     // 主要方法
-    public async Task DownloadAsync(List<MediaInfo> medias, CancellationToken cancel)
+    public async Task DownloadAsync(List<DownloadInfo> medias, CancellationToken cancel)
     {
         logger.LogInformation("下载 {Count} 个媒体文件:", medias.Count);
 
@@ -40,7 +40,7 @@ public class HttpDownloader(ILogger<HttpDownloader> logger, CommandLineOptions o
         );
     }
 
-    private async ValueTask DownloadTaskAsync(MediaInfo media, CancellationToken cancel)
+    private async ValueTask DownloadTaskAsync(DownloadInfo media, CancellationToken cancel)
     {
         // 弹性
         var pipeline = new ResiliencePipelineBuilder()

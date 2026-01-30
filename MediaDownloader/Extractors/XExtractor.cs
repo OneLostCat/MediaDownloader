@@ -78,7 +78,7 @@ public class XExtractor(ILogger<XExtractor> logger, CommandLineOptions options, 
     }
     
     // 主要方法
-    public async Task<List<MediaInfo>> ExtractAsync(CancellationToken cancel)
+    public async Task<List<DownloadInfo>> ExtractAsync(CancellationToken cancel)
     {
         // 获取用户信息
         var user = await GetUserByScreenNameAsync(options.User, cancel);
@@ -234,10 +234,10 @@ public class XExtractor(ILogger<XExtractor> logger, CommandLineOptions options, 
         return (list, nextCursor);
     }
 
-    private async Task<List<MediaInfo>> GetMediasAsync(XUser user, List<XTweet> tweets, CancellationToken cancel)
+    private async Task<List<DownloadInfo>> GetMediasAsync(XUser user, List<XTweet> tweets, CancellationToken cancel)
     {
         var template = Template.Parse("{{user}}/{{id}} {{time}} {{index}}");
-        var medias = new List<MediaInfo>();
+        var medias = new List<DownloadInfo>();
 
         // 遍历帖子
         foreach (var tweet in tweets)
@@ -268,9 +268,9 @@ public class XExtractor(ILogger<XExtractor> logger, CommandLineOptions options, 
                 // 跳过无需下载的媒体类型
                 if (options.Type.All(x => x != media.Type switch
                     {
-                        XMediaType.Image => MediaType.Image,
-                        XMediaType.Video => MediaType.Video,
-                        XMediaType.Gif => MediaType.Gif,
+                        XMediaType.Image => DownloadType.Image,
+                        XMediaType.Video => DownloadType.Video,
+                        XMediaType.Gif => DownloadType.Gif,
                         _ => throw new ArgumentOutOfRangeException(nameof(x), x, "未知的媒体类型")
                     }))
                 {
@@ -287,28 +287,29 @@ public class XExtractor(ILogger<XExtractor> logger, CommandLineOptions options, 
 
                     items.Add((video.Url, Path.GetExtension(new Uri(video.Url).Segments.Last())));
                 }
+
+                var type = media.Type switch
+                {
+                    XMediaType.Image => MediaType.Image,
+                    XMediaType.Video => MediaType.Video,
+                    XMediaType.Gif => MediaType.Gif,
+                    _ => throw new ArgumentOutOfRangeException(nameof(media.Type), media.Type, "未知媒体类型")
+                };
                 
                 var context = new TemplateData
                 {
                     Id = tweet.Id,
                     User = user.Name,
                     Time = tweet.CreationTime.LocalDateTime,
-                    Type = media.Type switch
-                    {
-                        XMediaType.Image => MediaType.Image,
-                        XMediaType.Video => MediaType.Video,
-                        XMediaType.Gif => MediaType.Gif,
-                        _ => throw new ArgumentOutOfRangeException(nameof(media.Type), media.Type, "未知媒体类型")
-                    },
+                    Type = type,
                     Index = i + 1,
                 };
 
                 // 添加媒体项
                 foreach (var item in items)
                 {
-                    var info = new MediaInfo
+                    var info = new DownloadInfo
                     {
-                        Id = tweet.Id,
                         Path = await utilities.RenderAsync(template, context),
                         Downloader = Models.MediaDownloader.Http,
                         Url = item.Url,

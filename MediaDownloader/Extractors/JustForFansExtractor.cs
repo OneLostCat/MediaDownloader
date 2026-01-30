@@ -23,7 +23,7 @@ public partial class JustForFansExtractor(
     private string _userHash = null!;
     private string? _playlistId;
 
-    public async Task<List<MediaInfo>> ExtractAsync(CancellationToken cancel)
+    public async Task<List<DownloadInfo>> ExtractAsync(CancellationToken cancel)
     {
         // 初始化
         await Init();
@@ -50,29 +50,31 @@ public partial class JustForFansExtractor(
         var playlistTitle = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {options.User} Extract";
         await CreatePlaylistAsync(playlistTitle);
 
-        // 获取播放列表 ID
+        // 获取播放列表 ID 和帖子 ID
         _playlistId = await GetPlaylistIdAsync(playlistTitle);
-
+        var ids = medias.Select(media => media.Id).ToHashSet().ToList(); // ID 去重
+        
         // 添加视频到播放列表
-        await AddVideosToPlaylistAsync(medias);
+        await AddVideosToPlaylistAsync(ids); 
 
         // 获取播放列表视频 URL
         var videos = await GetPlaylistVideosAsync();
 
-        // 更新媒体 URL
-        foreach (var media in medias)
+        // 更新视频 URL
+        foreach (var pair in videos)
         {
-            if (videos.TryGetValue(media.Id, out var url))
-            {
-                media.Url = url;
-            }
-            else
-            {
-                logger.LogWarning("无法找到媒体 URL: {Id}", media.Id);
-            }
+            medias.FirstOrDefault(x => x.Id == pair.Key)?.Url = pair.Value;
         }
 
-        return medias;
+        // 构建下载信息
+        var download = medias.Select(x => new DownloadInfo
+        {
+            Path = x.Path,
+            Downloader = x.Downloader,
+            Url = x.Url!
+        }).ToList();
+        
+        return download;
     }
 
     private async Task Init()
@@ -348,7 +350,7 @@ public partial class JustForFansExtractor(
                     Time = post.Time,
                     Text = ReplaceInvalidFileNameChars(post.Text),
                     Tags = ReplaceInvalidFileNameChars(string.Join(" ", post.Tags)),
-                    Type = MediaType.Video,
+                    Type = MediaType.Video
                 };
 
                 var media = new MediaInfo
@@ -374,7 +376,7 @@ public partial class JustForFansExtractor(
                         Text = ReplaceInvalidFileNameChars(post.Text),
                         Tags = ReplaceInvalidFileNameChars(string.Join(" ", post.Tags)),
                         Index = index++,
-                        Type = MediaType.Image,
+                        Type = MediaType.Photo,
                     };
 
                     var media = new MediaInfo
@@ -382,7 +384,7 @@ public partial class JustForFansExtractor(
                         Id = post.Id,
                         Path = (await utilities.RenderAsync(imageTemplate, context)).Trim() + GetExtension(url),
                         Downloader = Models.MediaDownloader.JustForFans,
-                        Url = url,
+                        Url = url
                     };
 
                     medias.Add(media);
@@ -459,14 +461,11 @@ public partial class JustForFansExtractor(
         return id;
     }
 
-    private async Task AddVideosToPlaylistAsync(List<MediaInfo> medias)
+    private async Task AddVideosToPlaylistAsync(List<string> ids)
     {
         logger.LogInformation("添加到播放列表 {PlaylistId}:", _playlistId);
-
-        // ID 去重
-        var set = medias.Select(x=> x.Id).ToHashSet();
         
-        foreach (var id in set)
+        foreach (var id in ids)
         {
             // 获取 Verify
             var verify = await GetPlaylistVerifyAsync(id);

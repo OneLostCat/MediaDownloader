@@ -7,6 +7,6 @@ public record CommandLineOptions(
     string Output,
     string? OutputTemplate,
     string DateTimeFormat,
-    List<MediaType> Type,
+    List<DownloadType> Type,
     int Concurrency
 );
