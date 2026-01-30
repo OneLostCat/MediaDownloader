@@ -31,7 +31,7 @@ public class XExtractor(ILogger<XExtractor> logger, CommandLineOptions options) 
         {
             Medias = medias,
             Downloader = Models.MediaDownloader.Http,
-            DefaultTemplate = "{{user}}/{{id}}-{{year}}-{{month}}-{{day}}_{{hour}}-{{minute}}-{{second}}-{{index}}-{{type}}"
+            DefaultTemplate = "{{user}}/{{id}} {{time}} {{index}}"
         };
     }
 
@@ -230,22 +230,14 @@ public class XExtractor(ILogger<XExtractor> logger, CommandLineOptions options) 
                     items.Add((video.Url, Path.GetExtension(new Uri(video.Url).Segments.Last())));
                 }
 
-                // 获取时间
-                var time = tweet.CreationTime.LocalDateTime;
-
                 // 添加媒体项
                 medias.AddRange(items.Select(item => new MediaInfo
                 {
                     Url = item.Url,
                     Extension = item.Extension,
-                    User = user.Name,
                     Id = tweet.Id,
-                    Year = time.Year.ToString("D4"),
-                    Month = time.Month.ToString("D2"),
-                    Day = time.Day.ToString("D2"),
-                    Hour = time.Hour.ToString("D2"),
-                    Minute = time.Minute.ToString("D2"),
-                    Second = time.Second.ToString("D2"),
+                    User = user.Name,
+                    Time = tweet.CreationTime.LocalDateTime,
                     Index = i + 1,
                     Type = media.Type switch
                     {

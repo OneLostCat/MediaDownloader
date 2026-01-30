@@ -52,13 +52,13 @@ public partial class JustForFansExtractor(ILogger<JustForFansExtractor> logger, 
         await DeletePlaylistAsync(_userHash, playlistId);
 
         // 合并视频信息
-        MergeVideoInfo(ref posts, videos);
+        var medias = GetMedias(options.User, posts, videos);
         
         return new MediaCollection
         {
-            Medias = [],
+            Medias = medias,
             Downloader = Models.MediaDownloader.Http,
-            DefaultTemplate = "{user}/{id}-{title}"
+            DefaultTemplate = "{{user}}/{{id}} {{time}} {{text}} {{tags}} {{index}}"
         };
     }
 
@@ -252,10 +252,12 @@ public partial class JustForFansExtractor(ILogger<JustForFansExtractor> logger, 
                 var text = "";
                 var tags = new List<string>();
 
+                // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
                 if (textNode != null)
                 {
                     var tagNodes = textNode.SelectNodes(".//a[starts-with(text(), '#')]");
 
+                    // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
                     if (tagNodes != null)
                     {
                         tags = tagNodes
@@ -293,7 +295,6 @@ public partial class JustForFansExtractor(ILogger<JustForFansExtractor> logger, 
                     Type = type,
                     Text = text,
                     Tags = tags,
-                    Video = "",
                     Images = images
                 });
             }
@@ -395,7 +396,7 @@ public partial class JustForFansExtractor(ILogger<JustForFansExtractor> logger, 
         return verify;
     }
 
-    private async Task<Dictionary<string, string>> GetPlaylistVideosAsync(string playlistId)
+    private async Task<Dictionary<string, VideoSource>> GetPlaylistVideosAsync(string playlistId)
     {
         // 获取播放列表内容
         var text = await GetAsync($"{BaseUrl}/ajax/getPlaylistForTray.php?PlaylistID={playlistId}");
@@ -413,18 +414,12 @@ public partial class JustForFansExtractor(ILogger<JustForFansExtractor> logger, 
         }
 
         // 解析 ID
-        var ids = new List<string>();
-
-        foreach (var node in idNodes)
-        {
-            var id = node
-                .GetAttributeValue("id", "")
-                .Replace("remove-video-", "")
-                .Split('-')
-                [0];
-
-            ids.Add(id);
-        }
+        var ids = idNodes.Select(node => node
+            .GetAttributeValue("id", "")
+            .Replace("remove-video-", "")
+            .Split('-')
+            .First()
+        ).ToList();
 
         // 获取视频节点
         var videoNodes = html.DocumentNode.SelectNodes("//div[contains(@class, 'playlist-tray-video-item')]");
@@ -434,7 +429,7 @@ public partial class JustForFansExtractor(ILogger<JustForFansExtractor> logger, 
             throw new InvalidOperationException("无法找到帖子视频");
         }
 
-        var videos = new List<string>();
+        var videos = new List<VideoSource>();
 
         foreach (var node in videoNodes)
         {
@@ -452,7 +447,7 @@ public partial class JustForFansExtractor(ILogger<JustForFansExtractor> logger, 
                 .OrderByDescending(source => int.Parse(source.Res))
                 .First();
 
-            videos.Add(best.Src);
+            videos.Add(best);
         }
 
         return ids.Zip(videos).ToDictionary(x => x.First, x => x.Second);
@@ -461,19 +456,62 @@ public partial class JustForFansExtractor(ILogger<JustForFansExtractor> logger, 
     private async Task DeletePlaylistAsync(string userHash, string playlistId)
     {
         logger.LogInformation("删除播放列表 {PlaylistId}", playlistId);
-        
+
         await GetAsync($"{BaseUrl}/ajax/playlists.php?Action=DeletePlaylist&UserHash={userHash}&PlaylistID={playlistId}");
     }
-    
-    private void MergeVideoInfo(ref List<PostInfo> posts, Dictionary<string, string> videos)
+
+    private List<MediaInfo> GetMedias(string posterName, List<PostInfo> posts, Dictionary<string, VideoSource> videos)
     {
+        var medias = new List<MediaInfo>();
+
         foreach (var post in posts)
         {
-            if (videos.TryGetValue(post.Id, out var url))
+            if (post.Type == PostType.Video)
             {
-                post.Video = url;
+                if (!videos.TryGetValue(post.Id, out var video))
+                {
+                    logger.LogWarning("无法找到帖子视频: {Id}", post.Id);
+                    continue;
+                }
+
+                var media = new MediaInfo
+                {
+                    Url = video.Src,
+                    Extension = video.Type switch
+                    {
+                        "video/mp4" => ".mp4",
+                        "video/webm" => ".webm",
+                        _ => throw new ArgumentOutOfRangeException(nameof(video.Type), video.Type, "未知视频类型")
+                    },
+                    User = posterName,
+                    Id = post.Id,
+                    Time = post.Time,
+                    Index = 1,
+                    Type = MediaType.Video,
+                    Text = post.Text,
+                    Tags = string.Join(" ",post.Tags)
+                };
+
+                medias.Add(media);
+            }
+            else
+            {
+                medias.AddRange(post.Images.Select((url, i) => new MediaInfo
+                {
+                    Url = url,
+                    Extension = GetExtension(url),
+                    User = posterName,
+                    Id = post.Id,
+                    Time = post.Time,
+                    Index = i + 1,
+                    Type = MediaType.Image,
+                    Text = post.Text,
+                    Tags = string.Join(" ",post.Tags)
+                }));
             }
         }
+
+        return medias;
     }
 
     // 工具方法
@@ -524,6 +562,15 @@ public partial class JustForFansExtractor(ILogger<JustForFansExtractor> logger, 
         );
 
         return response;
+    }
+
+    private string GetExtension(string url)
+    {
+        var uri = new Uri(url);
+        var filename = uri.Segments.Last();
+        var extension = Path.GetExtension(filename).ToLower();
+
+        return extension;
     }
 
     // 正则表达式
