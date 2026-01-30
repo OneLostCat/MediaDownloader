@@ -3,6 +3,7 @@ using MediaDownloader.Models;
 using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Logging;
 using Polly;
+using Polly.Retry;
 using Scriban;
 using Scriban.Functions;
 using Scriban.Runtime;
@@ -15,23 +16,11 @@ public class HttpDownloader(ILogger<HttpDownloader> logger, CommandLineOptions o
 
     private static HttpClient BuildHttpClient()
     {
-        // 弹性
-        var resiliencePipeline = new ResiliencePipelineBuilder<HttpResponseMessage>()
-            .AddRetry(new HttpRetryStrategyOptions
-            {
-                BackoffType = DelayBackoffType.Exponential,
-                Delay = TimeSpan.FromSeconds(2),
-                MaxRetryAttempts = 3,
-                UseJitter = true
-            })
-            .Build();
-
-        var socketHandler = new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(15) }; // 连接池生命周期
-
-        var resilienceHandler = new ResilienceHandler(resiliencePipeline) { InnerHandler = socketHandler };
+        // 连接池生命周期
+        var handler = new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(15) }; 
 
         // 创建 HttpClient
-        var http = new HttpClient(resilienceHandler);
+        var http = new HttpClient(handler);
 
         // 启用 HTTP/2 和 HTTP/3
         http.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
@@ -60,34 +49,52 @@ public class HttpDownloader(ILogger<HttpDownloader> logger, CommandLineOptions o
 
     private async ValueTask DownloadTaskAsync(MediaInfo media, Template template, CancellationToken cancel)
     {
-        // 生成路径
-        var path = await RenderAsync(template, media) + media.Extension;
+        // 弹性
+        var pipeline = new ResiliencePipelineBuilder()
+            .AddRetry(new RetryStrategyOptions
+            {
+                BackoffType = DelayBackoffType.Exponential,
+                Delay = TimeSpan.FromSeconds(2),
+                MaxRetryAttempts = 5,
+                UseJitter = true
+            })
+            .Build();
 
-        // 检查文件是否存在
-        var file = new FileInfo(Path.Combine(options.Output, path));
-
-        if (file.Exists)
+        // 执行下载任务
+        await pipeline.ExecuteAsync(async token =>
         {
-            logger.LogInformation("  文件已存在: {Path}", path);
-            return;
-        }
+            // 生成路径
+            var path = await RenderAsync(template, media) + media.Extension;
 
-        logger.LogInformation("  {Url} -> {Path}", media.Url, path);
+            // 检查文件是否存在
+            var file = new FileInfo(Path.Combine(options.Output, path));
 
-        // 发送请求
-        var response = await _http.GetAsync(media.Url, cancel);
+            if (file.Exists)
+            {
+                logger.LogInformation("  文件已存在: {Path}", path);
+                return;
+            }
 
-        // 写入临时文件
-        var temp = new FileInfo(Path.GetTempFileName());
+            logger.LogInformation("  {Url} -> {Path}", media.Url, path);
 
-        await using (var stream = temp.Create())
-        {
-            await response.Content.CopyToAsync(stream, cancel);
-        }
+            // 发送请求
+            var response = await _http.GetAsync(media.Url, token);
+            
+            // 确保成功状态码
+            response.EnsureSuccessStatusCode();
 
-        // 移动文件
-        file.Directory?.Create();
-        temp.MoveTo(file.FullName);
+            // 写入临时文件
+            var temp = new FileInfo(Path.GetTempFileName());
+
+            await using (var stream = temp.Create())
+            {
+                await response.Content.CopyToAsync(stream, token);
+            }
+
+            // 移动文件
+            file.Directory?.Create();
+            temp.MoveTo(file.FullName);
+        }, cancel);
     }
 
     // 工具方法

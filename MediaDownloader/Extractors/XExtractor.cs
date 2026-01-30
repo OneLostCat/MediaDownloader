@@ -17,6 +17,65 @@ public class XExtractor(ILogger<XExtractor> logger, CommandLineOptions options) 
 {
     private readonly HttpClient _http = BuildHttpClient(options.Cookie);
 
+    private static HttpClient BuildHttpClient(string cookieFile)
+    {
+        var baseUrl = new Uri("https://x.com/i/api/graphql/");
+        
+        // 读取 Cookie
+        var cookie = new CookieContainer();
+        var cookieHeader = File.ReadAllText(cookieFile);
+
+        foreach (var item in cookieHeader.Split(';', StringSplitOptions.TrimEntries))
+        {
+            var pair = item.Split('=');
+            cookie.Add(baseUrl, new Cookie(pair[0], pair[1]));
+        }
+        
+        var socketHandler = new SocketsHttpHandler
+        {
+            UseCookies = true,
+            CookieContainer = cookie,
+            PooledConnectionLifetime = TimeSpan.FromMinutes(15) // 连接池生命周期
+        };
+        
+        // 弹性
+        var resiliencePipeline = new ResiliencePipelineBuilder<HttpResponseMessage>()
+            .AddRetry(new HttpRetryStrategyOptions
+            {
+                BackoffType = DelayBackoffType.Exponential,
+                Delay = TimeSpan.FromSeconds(2),
+                MaxRetryAttempts = 5,
+                UseJitter = true
+            })
+            .Build();
+        
+        var resilienceHandler = new ResilienceHandler(resiliencePipeline) { InnerHandler = socketHandler };
+        
+        // 创建 HttpClient
+        var http = new HttpClient(resilienceHandler);
+        
+        // 设置基地址
+        http.BaseAddress = baseUrl;
+
+        // 启用 HTTP/2 和 HTTP/3
+        http.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
+
+        // 设置 User Agent
+        http.DefaultRequestHeaders.UserAgent.ParseAdd(
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 Edg/137.0.0.0");
+
+        // 设置认证头
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
+            "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA");
+
+        http.DefaultRequestHeaders.Add("X-Csrf-Token", cookie.GetCookies(baseUrl)["ct0"]?.Value);
+        http.DefaultRequestHeaders.Add("X-Twitter-Active-User", "yes");
+        http.DefaultRequestHeaders.Add("X-Twitter-Auth-Type", "OAuth2Session");
+        http.DefaultRequestHeaders.Add("X-Twitter-Client-Language", cookie.GetCookies(baseUrl)["lang"]?.Value);
+
+        return http;
+    }
+    
     // 主要方法
     public async Task<MediaCollection> ExtractAsync(CancellationToken cancel)
     {
@@ -256,63 +315,7 @@ public class XExtractor(ILogger<XExtractor> logger, CommandLineOptions options) 
     }
 
     // 工具方法
-    private static HttpClient BuildHttpClient(string cookieFile)
-    {
-        var baseUrl = new Uri("https://x.com/i/api/graphql/");
-        
-        // 读取 Cookie
-        var cookie = new CookieContainer();
-        var cookieHeader = File.ReadAllText(cookieFile);
-
-        foreach (var item in cookieHeader.Split(';', StringSplitOptions.TrimEntries))
-        {
-            var pair = item.Split('=');
-            cookie.Add(baseUrl, new Cookie(pair[0], pair[1]));
-        }
-        
-        var socketHandler = new SocketsHttpHandler
-        {
-            UseCookies = true,
-            CookieContainer = cookie,
-            PooledConnectionLifetime = TimeSpan.FromMinutes(15) // 连接池生命周期
-        };
-        
-        // 弹性
-        var resiliencePipeline = new ResiliencePipelineBuilder<HttpResponseMessage>()
-            .AddRetry(new HttpRetryStrategyOptions
-            {
-                BackoffType = DelayBackoffType.Exponential,
-                Delay = TimeSpan.FromSeconds(2),
-                MaxRetryAttempts = 5
-            })
-            .Build();
-        
-        var resilienceHandler = new ResilienceHandler(resiliencePipeline) { InnerHandler = socketHandler };
-        
-        // 创建 HttpClient
-        var http = new HttpClient(resilienceHandler);
-        
-        // 设置基地址
-        http.BaseAddress = baseUrl;
-
-        // 启用 HTTP/2 和 HTTP/3
-        http.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
-
-        // 设置 User Agent
-        http.DefaultRequestHeaders.UserAgent.ParseAdd(
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 Edg/137.0.0.0");
-
-        // 设置认证头
-        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
-            "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA");
-
-        http.DefaultRequestHeaders.Add("X-Csrf-Token", cookie.GetCookies(baseUrl)["ct0"]?.Value);
-        http.DefaultRequestHeaders.Add("X-Twitter-Active-User", "yes");
-        http.DefaultRequestHeaders.Add("X-Twitter-Auth-Type", "OAuth2Session");
-        http.DefaultRequestHeaders.Add("X-Twitter-Client-Language", cookie.GetCookies(baseUrl)["lang"]?.Value);
-
-        return http;
-    }
+    
 
     private static string BuildUrl(string endpoint, string variables, string? features = null, string? fieldToggles = null)
     {
