@@ -6,5 +6,6 @@ public record CommandLineOptions(
     string Cookie,
     string Output,
     string? OutputTemplate,
-    List<MediaType> Type
+    List<MediaType> Type,
+    int Concurrency
 );

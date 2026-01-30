@@ -1,20 +1,37 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using MediaDownloader.Models;
+using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Logging;
+using Polly;
 using Scriban;
 using Scriban.Functions;
 using Scriban.Runtime;
 
 namespace MediaDownloader.Downloaders;
 
-public class HttpDownloader(ILogger<HttpDownloader> logger, CommandLineOptions args) : IMediaDownloader
+public class HttpDownloader(ILogger<HttpDownloader> logger, CommandLineOptions options) : IMediaDownloader
 {
     private readonly HttpClient _http = BuildHttpClient();
 
     private static HttpClient BuildHttpClient()
     {
+        // 弹性
+        var resiliencePipeline = new ResiliencePipelineBuilder<HttpResponseMessage>()
+            .AddRetry(new HttpRetryStrategyOptions
+            {
+                BackoffType = DelayBackoffType.Exponential,
+                Delay = TimeSpan.FromSeconds(2),
+                MaxRetryAttempts = 3,
+                UseJitter = true
+            })
+            .Build();
+
+        var socketHandler = new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(15) }; // 连接池生命周期
+
+        var resilienceHandler = new ResilienceHandler(resiliencePipeline) { InnerHandler = socketHandler };
+
         // 创建 HttpClient
-        var http = new HttpClient();
+        var http = new HttpClient(resilienceHandler);
 
         // 启用 HTTP/2 和 HTTP/3
         http.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
@@ -29,14 +46,14 @@ public class HttpDownloader(ILogger<HttpDownloader> logger, CommandLineOptions a
     // 主要方法
     public async Task DownloadAsync(MediaCollection medias, CancellationToken cancel)
     {
-        var template = Template.Parse(args.OutputTemplate ?? medias.DefaultTemplate);
+        var template = Template.Parse(options.OutputTemplate ?? medias.DefaultTemplate);
 
         logger.LogInformation("下载 {Count} 个媒体文件:", medias.Medias.Count);
 
         // 并行下载
         await Parallel.ForEachAsync(
             medias.Medias,
-            new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = cancel},
+            new ParallelOptions { MaxDegreeOfParallelism = options.Concurrency, CancellationToken = cancel },
             async (media, token) => await DownloadTaskAsync(media, template, token)
         );
     }
@@ -47,7 +64,7 @@ public class HttpDownloader(ILogger<HttpDownloader> logger, CommandLineOptions a
         var path = await RenderAsync(template, media) + media.Extension;
 
         // 检查文件是否存在
-        var file = new FileInfo(Path.Combine(args.Output, path));
+        var file = new FileInfo(Path.Combine(options.Output, path));
 
         if (file.Exists)
         {
@@ -62,7 +79,7 @@ public class HttpDownloader(ILogger<HttpDownloader> logger, CommandLineOptions a
 
         // 写入临时文件
         var temp = new FileInfo(Path.GetTempFileName());
-        
+
         await using (var stream = temp.Create())
         {
             await response.Content.CopyToAsync(stream, cancel);

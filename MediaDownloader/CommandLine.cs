@@ -22,6 +22,13 @@ public static class CommandLine
     private static readonly Option<string> CookieOption = new("-c", "--cookie")
         { Description = "用于请求的 Cookie", DefaultValueFactory = _ => "cookie.txt" };
 
+    // 输出选项
+    public static readonly Option<string> OutputOption = new("-o", "--output")
+        { Description = "输出目录", DefaultValueFactory = _ => "." };
+
+    public static readonly Option<string> OutputTemplateOption = new("-O", "--output-template")
+        { Description = "输出文件路径格式" };
+    
     // 下载选项
     private static readonly Option<List<MediaType>> TypeOption = new("-t", "--type")
     {
@@ -30,13 +37,9 @@ public static class CommandLine
         AllowMultipleArgumentsPerToken = true,
         Arity = ArgumentArity.OneOrMore
     };
-
-    // 输出选项
-    public static readonly Option<string> OutputOption = new("-o", "--output")
-        { Description = "输出目录", DefaultValueFactory = _ => "." };
-
-    public static readonly Option<string> OutputTemplateOption = new("-O", "--output-template")
-        { Description = "输出文件路径格式" };
+    
+    private static readonly Option<int> ConcurrencyOption = new("-C", "--concurrency")
+        { Description = "下载并发数量", DefaultValueFactory = _ => 4 };
 
     // 路径格式转换选项
     public static readonly Option<string> SourceDirOption = new("-s", "--source")
@@ -69,6 +72,7 @@ public static class CommandLine
             OutputOption,
             OutputTemplateOption,
             TypeOption,
+            ConcurrencyOption,
             convertCommand
         };
 
@@ -111,7 +115,8 @@ public static class CommandLine
                 result.GetRequiredValue(CookieOption),
                 result.GetRequiredValue(OutputOption),
                 result.GetValue(OutputTemplateOption),
-                result.GetRequiredValue(TypeOption)
+                result.GetRequiredValue(TypeOption),
+                result.GetRequiredValue(ConcurrencyOption)
             ));
 
             // 运行

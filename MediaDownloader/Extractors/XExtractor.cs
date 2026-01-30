@@ -7,7 +7,9 @@ using System.Text.Json;
 using MediaDownloader.Models;
 using MediaDownloader.Models.X;
 using MediaDownloader.Models.X.Api;
+using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Logging;
+using Polly;
 
 namespace MediaDownloader.Extractors;
 
@@ -257,7 +259,7 @@ public class XExtractor(ILogger<XExtractor> logger, CommandLineOptions options) 
     private static HttpClient BuildHttpClient(string cookieFile)
     {
         var baseUrl = new Uri("https://x.com/i/api/graphql/");
-
+        
         // 读取 Cookie
         var cookie = new CookieContainer();
         var cookieHeader = File.ReadAllText(cookieFile);
@@ -267,16 +269,28 @@ public class XExtractor(ILogger<XExtractor> logger, CommandLineOptions options) 
             var pair = item.Split('=');
             cookie.Add(baseUrl, new Cookie(pair[0], pair[1]));
         }
-
-        // 创建 HttpClientHandler
-        var httpClientHandler = new HttpClientHandler
+        
+        var socketHandler = new SocketsHttpHandler
         {
             UseCookies = true,
             CookieContainer = cookie,
+            PooledConnectionLifetime = TimeSpan.FromMinutes(15) // 连接池生命周期
         };
-
+        
+        // 弹性
+        var resiliencePipeline = new ResiliencePipelineBuilder<HttpResponseMessage>()
+            .AddRetry(new HttpRetryStrategyOptions
+            {
+                BackoffType = DelayBackoffType.Exponential,
+                Delay = TimeSpan.FromSeconds(2),
+                MaxRetryAttempts = 5
+            })
+            .Build();
+        
+        var resilienceHandler = new ResilienceHandler(resiliencePipeline) { InnerHandler = socketHandler };
+        
         // 创建 HttpClient
-        var http = new HttpClient(httpClientHandler);
+        var http = new HttpClient(resilienceHandler);
         
         // 设置基地址
         http.BaseAddress = baseUrl;
